@@ -8,7 +8,8 @@ const path = require('path');
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../client')));
+const CLIENT_DIR = path.join(__dirname, '..', 'client');
+app.use(express.static(CLIENT_DIR));
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
@@ -220,7 +221,7 @@ wss.on('connection', (ws) => {
 
 // Catch-all → serve index.html
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/index.html'));
+  res.sendFile(path.join(CLIENT_DIR, 'index.html'));
 });
 
 const PORT = process.env.PORT || 3000;
