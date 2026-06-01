@@ -6,25 +6,26 @@
 <title>LiveRoom — Watch Together</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<script src="/socket.io/socket.io.js"></script>
 <style>
   :root {
-    --bg: #0a0a0f;
-    --surface: #111118;
-    --surface2: #1a1a24;
-    --surface3: #22222f;
-    --border: #2a2a3a;
+    --bg: #080810;
+    --surface: #0f0f1a;
+    --surface2: #16162a;
+    --surface3: #1e1e30;
+    --border: #252538;
     --accent: #7c3aed;
+    --accent-hover: #6d28d9;
     --accent2: #06b6d4;
     --accent3: #f59e0b;
-    --text: #e8e8f0;
-    --text2: #9090a8;
-    --text3: #5a5a72;
+    --text: #e8e8f4;
+    --text2: #8888aa;
+    --text3: #44445a;
     --danger: #ef4444;
     --success: #10b981;
-    --glow: 0 0 20px rgba(124,58,237,0.3);
-    --glow2: 0 0 20px rgba(6,182,212,0.3);
-    --radius: 12px;
-    --radius-sm: 8px;
+    --glow: 0 0 30px rgba(124,58,237,0.25);
+    --radius: 14px;
+    --radius-sm: 9px;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -45,9 +46,10 @@
     align-items: center;
     justify-content: center;
     padding: 2rem;
-    background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(124,58,237,0.15) 0%, transparent 70%),
-                radial-gradient(ellipse 60% 40% at 80% 80%, rgba(6,182,212,0.08) 0%, transparent 60%),
-                var(--bg);
+    background:
+      radial-gradient(ellipse 90% 60% at 50% -10%, rgba(124,58,237,0.18) 0%, transparent 65%),
+      radial-gradient(ellipse 50% 40% at 90% 90%, rgba(6,182,212,0.09) 0%, transparent 55%),
+      var(--bg);
     position: relative;
   }
 
@@ -55,29 +57,27 @@
     content: '';
     position: absolute;
     inset: 0;
-    background-image: radial-gradient(rgba(124,58,237,0.08) 1px, transparent 1px);
-    background-size: 40px 40px;
+    background-image: radial-gradient(rgba(124,58,237,0.06) 1px, transparent 1px);
+    background-size: 44px 44px;
     pointer-events: none;
   }
 
   .logo {
-    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    font-size: clamp(2.8rem, 7vw, 5rem);
     font-weight: 800;
-    letter-spacing: -2px;
+    letter-spacing: -3px;
     line-height: 1;
-    margin-bottom: 0.5rem;
-    background: linear-gradient(135deg, #fff 30%, var(--accent2) 100%);
+    margin-bottom: 0.4rem;
+    background: linear-gradient(135deg, #fff 20%, #c4b5fd 60%, var(--accent2) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
-  .logo span { color: var(--accent); -webkit-text-fill-color: var(--accent); }
-
   .tagline {
-    color: var(--text2);
-    font-size: 1rem;
-    letter-spacing: 3px;
+    color: var(--text3);
+    font-size: 0.72rem;
+    letter-spacing: 4px;
     text-transform: uppercase;
     margin-bottom: 3rem;
     font-family: 'Space Mono', monospace;
@@ -88,7 +88,7 @@
     grid-template-columns: 1fr 1fr;
     gap: 1.5rem;
     width: 100%;
-    max-width: 600px;
+    max-width: 620px;
   }
 
   @media (max-width: 520px) { .cards { grid-template-columns: 1fr; } }
@@ -99,38 +99,49 @@
     border-radius: var(--radius);
     padding: 1.8rem;
     transition: border-color 0.2s, box-shadow 0.2s;
+    position: relative;
+    overflow: hidden;
   }
 
-  .card:hover { border-color: var(--accent); box-shadow: var(--glow); }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .card:hover { border-color: rgba(124,58,237,0.4); box-shadow: var(--glow); }
+  .card:hover::before { opacity: 1; }
 
   .card h2 {
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 700;
     margin-bottom: 1.2rem;
-    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .badge {
-    display: inline-block;
     font-family: 'Space Mono', monospace;
-    font-size: 0.6rem;
-    padding: 2px 8px;
+    font-size: 0.58rem;
+    padding: 2px 7px;
     border-radius: 4px;
-    margin-left: 8px;
-    vertical-align: middle;
   }
+  .badge-new { background: rgba(124,58,237,0.25); color: #a78bfa; border: 1px solid rgba(124,58,237,0.3); }
+  .badge-join { background: rgba(6,182,212,0.2); color: var(--accent2); border: 1px solid rgba(6,182,212,0.3); }
 
-  .badge-new { background: var(--accent); color: #fff; }
-  .badge-join { background: var(--accent2); color: #000; }
-
-  .field { margin-bottom: 0.9rem; }
+  .field { margin-bottom: 0.85rem; }
   .field label {
     display: block;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     letter-spacing: 1.5px;
     text-transform: uppercase;
     color: var(--text3);
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.35rem;
     font-family: 'Space Mono', monospace;
   }
 
@@ -139,142 +150,142 @@
     background: var(--surface2);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    padding: 0.65rem 0.9rem;
+    padding: 0.6rem 0.85rem;
     color: var(--text);
     font-family: 'Space Mono', monospace;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
 
-  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,58,237,0.15); }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,58,237,0.12); }
+  input::placeholder { color: var(--text3); }
 
   .btn {
     display: block;
     width: 100%;
-    padding: 0.75rem 1rem;
+    padding: 0.72rem 1rem;
     border: none;
     border-radius: var(--radius-sm);
     font-family: 'Syne', sans-serif;
     font-weight: 700;
-    font-size: 0.85rem;
-    letter-spacing: 1px;
-    text-transform: uppercase;
+    font-size: 0.82rem;
+    letter-spacing: 0.5px;
     cursor: pointer;
-    transition: opacity 0.15s, transform 0.1s;
+    transition: all 0.15s;
   }
 
   .btn:active { transform: scale(0.98); }
-  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
   .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-hover); box-shadow: 0 4px 20px rgba(124,58,237,0.4); }
 
-  .btn-secondary { background: var(--accent2); color: #000; }
-  .btn-secondary:hover:not(:disabled) { opacity: 0.9; }
+  .btn-secondary { background: var(--accent2); color: #000; font-weight: 800; }
+  .btn-secondary:hover:not(:disabled) { opacity: 0.88; box-shadow: 0 4px 20px rgba(6,182,212,0.3); }
 
   .btn-ghost {
     background: transparent;
     color: var(--text2);
     border: 1px solid var(--border);
     width: auto;
-    padding: 0.5rem 1rem;
-    font-size: 0.75rem;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.72rem;
   }
-
   .btn-ghost:hover { border-color: var(--text2); color: var(--text); }
 
-  .btn-danger { background: var(--danger); color: #fff; width: auto; padding: 0.5rem 1rem; font-size: 0.75rem; }
+  .btn-danger { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); width: auto; padding: 0.45rem 0.9rem; font-size: 0.72rem; }
+  .btn-danger:hover { background: var(--danger); color: #fff; }
 
   .error-msg {
-    color: var(--danger);
-    font-size: 0.75rem;
+    color: #f87171;
+    font-size: 0.72rem;
     font-family: 'Space Mono', monospace;
-    margin-top: 0.5rem;
+    margin-top: 0.4rem;
+    padding: 0.4rem 0.6rem;
+    background: rgba(239,68,68,0.1);
+    border-radius: 6px;
+    border-left: 2px solid var(--danger);
     display: none;
   }
-
   .error-msg.show { display: block; }
 
-  /* ── ROOM LAYOUT ── */
-  #room {
-    display: none;
-    height: 100vh;
-    flex-direction: column;
-    background: var(--bg);
-  }
-
+  /* ── ROOM ── */
+  #room { display: none; height: 100vh; flex-direction: column; }
   #room.active { display: flex; }
 
   .room-header {
     display: flex;
     align-items: center;
-    padding: 0.75rem 1.2rem;
+    padding: 0.6rem 1rem;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-    gap: 0.8rem;
+    gap: 0.7rem;
     flex-shrink: 0;
     flex-wrap: wrap;
+    min-height: 52px;
   }
 
-  .room-title {
-    font-size: 1rem;
-    font-weight: 800;
-    letter-spacing: -0.5px;
-  }
+  .room-logo { font-size: 1rem; font-weight: 800; letter-spacing: -0.5px; color: var(--text); }
+  .room-logo span { color: var(--accent2); }
 
-  .room-id {
+  .room-id-chip {
     font-family: 'Space Mono', monospace;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     color: var(--accent2);
-    background: rgba(6,182,212,0.1);
-    padding: 2px 8px;
-    border-radius: 4px;
+    background: rgba(6,182,212,0.08);
+    border: 1px solid rgba(6,182,212,0.2);
+    padding: 3px 9px;
+    border-radius: 5px;
   }
 
   .online-pill {
     display: flex;
     align-items: center;
     gap: 5px;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     color: var(--success);
     font-family: 'Space Mono', monospace;
+    background: rgba(16,185,129,0.08);
+    border: 1px solid rgba(16,185,129,0.2);
+    padding: 3px 9px;
+    border-radius: 5px;
   }
 
   .online-dot {
-    width: 7px; height: 7px;
+    width: 6px; height: 6px;
     background: var(--success);
     border-radius: 50%;
     animation: pulse 2s infinite;
   }
 
-  @keyframes pulse {
-    0%,100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
 
-  .header-actions { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; }
-
-  .room-body {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
+  .conn-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.62rem;
+    padding: 3px 8px;
+    border-radius: 5px;
+    transition: all 0.3s;
   }
+  .conn-badge.connected { background: rgba(16,185,129,0.12); color: var(--success); border: 1px solid rgba(16,185,129,0.25); }
+  .conn-badge.connecting { background: rgba(245,158,11,0.12); color: var(--accent3); border: 1px solid rgba(245,158,11,0.25); }
+  .conn-badge.disconnected { background: rgba(239,68,68,0.12); color: var(--danger); border: 1px solid rgba(239,68,68,0.25); }
+  .conn-badge.reconnecting { background: rgba(245,158,11,0.12); color: var(--accent3); border: 1px solid rgba(245,158,11,0.25); animation: blink 1s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+  .header-right { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; }
+
+  .room-body { display: flex; flex: 1; overflow: hidden; }
 
   /* ── MEDIA PANEL ── */
-  .media-panel {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-width: 0;
-  }
+  .media-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 
   .media-toolbar {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    padding: 0.7rem 1rem;
+    gap: 0.5rem;
+    padding: 0.6rem 0.9rem;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
@@ -284,14 +295,14 @@
   .media-toolbar input[type=text] {
     flex: 1;
     min-width: 140px;
-    padding: 0.5rem 0.8rem;
-    font-size: 0.8rem;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.78rem;
   }
 
   .media-toolbar .btn {
     width: auto;
-    padding: 0.5rem 1rem;
-    font-size: 0.75rem;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.72rem;
     white-space: nowrap;
   }
 
@@ -302,13 +313,15 @@
     overflow: hidden;
   }
 
-  .media-container iframe {
+  .media-container iframe, .media-container video {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     border: none;
   }
+
+  .media-container video { object-fit: contain; background: #000; }
 
   .media-placeholder {
     position: absolute;
@@ -319,14 +332,49 @@
     justify-content: center;
     gap: 1rem;
     color: var(--text3);
+    background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(124,58,237,0.04), transparent);
   }
 
-  .media-placeholder svg { opacity: 0.2; }
-  .media-placeholder p { font-size: 0.85rem; font-family: 'Space Mono', monospace; }
+  .media-placeholder-icon {
+    width: 72px; height: 72px;
+    border-radius: 18px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text3);
+  }
+
+  .media-placeholder p {
+    font-size: 0.8rem;
+    font-family: 'Space Mono', monospace;
+    text-align: center;
+    max-width: 300px;
+    line-height: 1.6;
+  }
+
+  .media-placeholder .supported-platforms {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 0.5rem;
+  }
+
+  .platform-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.62rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text3);
+  }
 
   /* ── CHAT PANEL ── */
   .chat-panel {
-    width: 320px;
+    width: 310px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
@@ -336,156 +384,174 @@
 
   @media (max-width: 768px) {
     .room-body { flex-direction: column; }
-    .chat-panel {
-      width: 100%;
-      height: 280px;
-      border-left: none;
-      border-top: 1px solid var(--border);
-    }
+    .chat-panel { width: 100%; height: 260px; border-left: none; border-top: 1px solid var(--border); }
     .media-container { min-height: 200px; }
   }
 
   .chat-header {
-    padding: 0.8rem 1rem;
+    padding: 0.7rem 1rem;
     border-bottom: 1px solid var(--border);
-    font-size: 0.75rem;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--text3);
-    font-family: 'Space Mono', monospace;
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
   }
 
+  .chat-header-label {
+    font-size: 0.68rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text3);
+    font-family: 'Space Mono', monospace;
+  }
+
   .users-toggle {
     cursor: pointer;
     color: var(--accent2);
-    font-size: 0.7rem;
+    font-size: 0.68rem;
+    font-family: 'Space Mono', monospace;
     user-select: none;
+    transition: opacity 0.15s;
   }
+  .users-toggle:hover { opacity: 0.7; }
 
   .users-list {
-    padding: 0.6rem 1rem;
+    padding: 0.5rem 0.8rem;
     border-bottom: 1px solid var(--border);
     display: none;
     flex-wrap: wrap;
-    gap: 0.4rem;
+    gap: 0.35rem;
     background: var(--surface2);
-    max-height: 120px;
+    max-height: 110px;
     overflow-y: auto;
   }
-
   .users-list.show { display: flex; }
 
   .user-chip {
     display: flex;
     align-items: center;
     gap: 5px;
-    padding: 3px 8px;
+    padding: 3px 9px;
     border-radius: 100px;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     background: var(--surface3);
+    border: 1px solid var(--border);
     font-family: 'Space Mono', monospace;
   }
+  .user-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
-  .user-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-
+  /* ── MESSAGES ── */
   .chat-messages {
     flex: 1;
     overflow-y: auto;
-    padding: 0.8rem;
+    padding: 0.8rem 0.85rem;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0;
     scroll-behavior: smooth;
   }
-
-  .chat-messages::-webkit-scrollbar { width: 4px; }
-  .chat-messages::-webkit-scrollbar-track { background: transparent; }
+  .chat-messages::-webkit-scrollbar { width: 3px; }
   .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-  .msg {
+  /* Message group: name shown only once per consecutive sender */
+  .msg-group {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    animation: msgIn 0.2s ease;
+    margin-bottom: 0.85rem;
+    animation: msgIn 0.18s ease;
   }
 
-  @keyframes msgIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+  @keyframes msgIn { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
 
-  .msg.system .msg-text {
-    color: var(--text3);
-    font-style: italic;
-    font-size: 0.72rem;
-    text-align: center;
-    font-family: 'Space Mono', monospace;
-  }
-
-  .msg-meta {
+  .msg-group-header {
     display: flex;
     align-items: baseline;
     gap: 6px;
+    margin-bottom: 0.28rem;
+    padding-left: 2px;
   }
 
-  .msg-name {
+  .msg-group-name {
     font-size: 0.72rem;
     font-weight: 700;
     font-family: 'Space Mono', monospace;
   }
 
-  .msg-time {
-    font-size: 0.62rem;
+  .msg-group-time {
+    font-size: 0.6rem;
     color: var(--text3);
     font-family: 'Space Mono', monospace;
   }
 
-  .msg-text {
+  .msg-bubble {
     font-size: 0.82rem;
     color: var(--text);
+    line-height: 1.45;
     word-break: break-word;
-    line-height: 1.4;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px 12px 12px 12px;
+    padding: 0.42rem 0.7rem;
+    margin-bottom: 2px;
+    display: inline-block;
+    max-width: 100%;
   }
 
-  .msg.own .msg-text {
-    color: rgba(232,232,240,0.85);
+  .msg-bubble.own-bubble {
+    background: rgba(124,58,237,0.12);
+    border-color: rgba(124,58,237,0.2);
+    border-radius: 12px 4px 12px 12px;
+  }
+
+  /* System messages — compact, centered */
+  .msg-system {
+    text-align: center;
+    font-size: 0.68rem;
+    color: var(--text3);
+    font-family: 'Space Mono', monospace;
+    font-style: italic;
+    padding: 0.2rem 0;
+    margin-bottom: 0.4rem;
+    animation: msgIn 0.18s ease;
+  }
+
+  /* Continuation bubble (same sender, no header) */
+  .msg-continuation {
+    margin-bottom: 0;
   }
 
   .chat-input-area {
-    padding: 0.8rem;
+    padding: 0.7rem 0.8rem;
     border-top: 1px solid var(--border);
     display: flex;
-    gap: 0.5rem;
+    gap: 0.45rem;
     flex-shrink: 0;
+    background: var(--surface2);
   }
 
   .chat-input-area input {
     flex: 1;
-    padding: 0.6rem 0.8rem;
-    font-size: 0.82rem;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.8rem;
     border-radius: var(--radius-sm);
+    background: var(--surface);
   }
 
   .send-btn {
     background: var(--accent);
     border: none;
     border-radius: var(--radius-sm);
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     flex-shrink: 0;
-    transition: opacity 0.15s, transform 0.1s;
+    transition: all 0.15s;
     color: #fff;
   }
-
-  .send-btn:hover { opacity: 0.85; }
+  .send-btn:hover { background: var(--accent-hover); transform: scale(1.05); }
   .send-btn:active { transform: scale(0.95); }
 
   /* ── TOAST ── */
@@ -493,92 +559,62 @@
     position: fixed;
     bottom: 1.5rem;
     left: 50%;
-    transform: translateX(-50%) translateY(20px);
+    transform: translateX(-50%) translateY(16px);
     background: var(--surface2);
     border: 1px solid var(--border);
-    padding: 0.7rem 1.2rem;
+    padding: 0.6rem 1.1rem;
     border-radius: var(--radius-sm);
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-family: 'Space Mono', monospace;
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.2s, transform 0.2s;
     z-index: 999;
     white-space: nowrap;
+    color: var(--text);
+    backdrop-filter: blur(8px);
   }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-  #toast.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-
-  /* ── MODAL ── */
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    display: none;
-  }
-
-  .modal-overlay.show { display: flex; }
-
-  .modal {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.8rem;
-    width: 100%;
-    max-width: 360px;
-    margin: 1rem;
-  }
-
-  .modal h3 { font-size: 1.1rem; margin-bottom: 1.2rem; }
-
-  /* ── SPINNER ── */
   .spinner {
     display: inline-block;
-    width: 14px; height: 14px;
-    border: 2px solid rgba(255,255,255,0.3);
+    width: 13px; height: 13px;
+    border: 2px solid rgba(255,255,255,0.25);
     border-top-color: #fff;
     border-radius: 50%;
-    animation: spin 0.6s linear infinite;
+    animation: spin 0.55s linear infinite;
     vertical-align: middle;
-    margin-right: 6px;
+    margin-right: 5px;
   }
+  @keyframes spin { to{transform:rotate(360deg)} }
 
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* Connection status */
-  .conn-status {
+  /* Sync indicator */
+  .sync-badge {
     font-family: 'Space Mono', monospace;
-    font-size: 0.65rem;
+    font-size: 0.6rem;
+    color: var(--accent3);
+    background: rgba(245,158,11,0.1);
+    border: 1px solid rgba(245,158,11,0.25);
     padding: 2px 7px;
     border-radius: 4px;
+    display: none;
   }
-  .conn-status.connected { background: rgba(16,185,129,0.15); color: var(--success); }
-  .conn-status.connecting { background: rgba(245,158,11,0.15); color: var(--accent3); }
-  .conn-status.disconnected { background: rgba(239,68,68,0.15); color: var(--danger); }
+  .sync-badge.show { display: inline-block; }
 </style>
 </head>
 <body>
 
 <!-- LANDING -->
 <div id="landing">
-  <div class="logo">Live<span>Room</span></div>
-  <div class="tagline">Watch Together · Chat Live</div>
+  <div class="logo">Live<span style="-webkit-text-fill-color:var(--accent2);color:var(--accent2)">Room</span></div>
+  <div class="tagline">Watch Together · Perfectly in Sync</div>
 
   <div class="cards">
-    <!-- Create Room -->
     <div class="card">
       <h2>Create Room <span class="badge badge-new">NEW</span></h2>
       <div class="field">
         <label>Room ID</label>
-        <input type="text" id="create-room-id" placeholder="my-room-123" maxlength="32">
+        <input type="text" id="create-room-id" placeholder="my-room-123" maxlength="32" autocomplete="off">
       </div>
       <div class="field">
         <label>Password</label>
@@ -586,18 +622,17 @@
       </div>
       <div class="field">
         <label>Your Name</label>
-        <input type="text" id="create-username" placeholder="YourName" maxlength="24">
+        <input type="text" id="create-username" placeholder="YourName" maxlength="24" autocomplete="off">
       </div>
       <div id="create-error" class="error-msg"></div>
       <button class="btn btn-primary" id="create-btn" onclick="createRoom()">Create Room</button>
     </div>
 
-    <!-- Join Room -->
     <div class="card">
       <h2>Join Room <span class="badge badge-join">JOIN</span></h2>
       <div class="field">
         <label>Room ID</label>
-        <input type="text" id="join-room-id" placeholder="my-room-123" maxlength="32">
+        <input type="text" id="join-room-id" placeholder="my-room-123" maxlength="32" autocomplete="off">
       </div>
       <div class="field">
         <label>Password</label>
@@ -605,7 +640,7 @@
       </div>
       <div class="field">
         <label>Your Name</label>
-        <input type="text" id="join-username" placeholder="YourName" maxlength="24">
+        <input type="text" id="join-username" placeholder="YourName" maxlength="24" autocomplete="off">
       </div>
       <div id="join-error" class="error-msg"></div>
       <button class="btn btn-secondary" id="join-btn" onclick="joinRoom()">Join Room</button>
@@ -616,15 +651,16 @@
 <!-- ROOM -->
 <div id="room">
   <div class="room-header">
-    <div class="room-title">LiveRoom</div>
-    <div class="room-id" id="room-id-display"></div>
+    <div class="room-logo">Live<span>Room</span></div>
+    <div class="room-id-chip" id="room-id-display"></div>
     <div class="online-pill">
       <div class="online-dot"></div>
       <span id="online-count">0</span> online
     </div>
-    <span class="conn-status connecting" id="conn-status">connecting</span>
-    <div class="header-actions">
-      <button class="btn btn-ghost" onclick="copyRoomLink()">Share</button>
+    <span class="conn-badge connecting" id="conn-badge">connecting</span>
+    <span class="sync-badge" id="sync-badge">syncing…</span>
+    <div class="header-right">
+      <button class="btn btn-ghost" onclick="copyRoomLink()">⬡ Share</button>
       <button class="btn btn-danger" onclick="leaveRoom()">Leave</button>
     </div>
   </div>
@@ -633,36 +669,48 @@
     <!-- Media -->
     <div class="media-panel">
       <div class="media-toolbar">
-        <input type="text" id="media-url" placeholder="Paste YouTube or stream URL…">
-        <button class="btn btn-primary" onclick="setMedia()">Play</button>
-        <button class="btn btn-ghost" onclick="clearMedia()">Clear</button>
+        <input type="text" id="media-url" placeholder="YouTube, Twitch, Vimeo, Dailymotion, MP4, HLS…" autocomplete="off">
+        <button class="btn btn-primary" onclick="setMedia()">▶ Play</button>
+        <button class="btn btn-ghost" onclick="clearMedia()">✕ Clear</button>
       </div>
-      <div class="media-container">
+      <div class="media-container" id="media-container">
         <div class="media-placeholder" id="media-placeholder">
-          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <rect x="2" y="3" width="20" height="14" rx="2"/>
-            <path d="M8 21h8M12 17v4"/>
-          </svg>
-          <p>Paste a YouTube or stream URL above to start watching together</p>
+          <div class="media-placeholder-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+          </div>
+          <p>Paste a URL above to watch together — all viewers stay in sync automatically</p>
+          <div class="supported-platforms">
+            <span class="platform-tag">YouTube</span>
+            <span class="platform-tag">Twitch</span>
+            <span class="platform-tag">Vimeo</span>
+            <span class="platform-tag">Dailymotion</span>
+            <span class="platform-tag">Rumble</span>
+            <span class="platform-tag">MP4/HLS</span>
+            <span class="platform-tag">Any iframe</span>
+          </div>
         </div>
         <iframe id="media-iframe" style="display:none" allowfullscreen
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"></iframe>
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen">
+        </iframe>
+        <video id="media-video" style="display:none" controls preload="metadata"></video>
       </div>
     </div>
 
     <!-- Chat -->
     <div class="chat-panel">
       <div class="chat-header">
-        <span>Live Chat</span>
-        <span class="users-toggle" id="users-toggle" onclick="toggleUsers()">👥 Show Users</span>
+        <span class="chat-header-label">Live Chat</span>
+        <span class="users-toggle" id="users-toggle" onclick="toggleUsers()">👥 Users</span>
       </div>
       <div class="users-list" id="users-list"></div>
       <div class="chat-messages" id="chat-messages"></div>
       <div class="chat-input-area">
         <input type="text" id="chat-input" placeholder="Say something…" maxlength="500"
                onkeydown="if(event.key==='Enter')sendChat()">
-        <button class="send-btn" onclick="sendChat()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <button class="send-btn" onclick="sendChat()" title="Send">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/>
           </svg>
         </button>
@@ -671,30 +719,32 @@
   </div>
 </div>
 
-<!-- Toast -->
 <div id="toast"></div>
 
 <script>
-// ── CONFIG ──
-const API = '';  // same origin
-const WS_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
-
 // ── STATE ──
-let ws = null;
+let socket = null;
 let myUser = null;
 let currentRoomId = null;
 let currentPassword = null;
+let currentUsername = null;
 let usersShown = false;
-let reconnectTimer = null;
-let pingInterval = null;
+
+// Chat grouping
+let lastSenderId = null;
+let lastSenderTimestamp = 0;
+const GROUP_TIMEOUT = 5 * 60 * 1000; // 5 min — new group after 5 min gap
+
+// Video sync (for native video element)
+let isSyncingVideo = false;
 
 // ── UTILS ──
-function showToast(msg, duration = 3000) {
+function showToast(msg, dur = 3000) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.classList.remove('show'), duration);
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), dur);
 }
 
 function setError(id, msg) {
@@ -708,62 +758,165 @@ function fmtTime(ts) {
 }
 
 function sanitize(s) {
-  return String(s).replace(/[<>]/g, c => c === '<' ? '&lt;' : '&gt;');
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
 }
 
-// ── MEDIA ──
-function parseMediaUrl(url) {
-  url = url.trim();
-  // YouTube
-  const ytRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/;
-  const ytMatch = url.match(ytRegex);
-  if (ytMatch) {
-    return { type: 'youtube', embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1&rel=0` };
-  }
+function setConnBadge(state) {
+  const el = document.getElementById('conn-badge');
+  el.className = `conn-badge ${state}`;
+  el.textContent = state;
+}
+
+function setSyncBadge(show) {
+  document.getElementById('sync-badge').classList.toggle('show', show);
+}
+
+// ── MEDIA PARSING ──
+function parseMediaUrl(raw) {
+  const url = raw.trim();
+
+  // YouTube watch / short URL
+  const ytStd = url.match(/(?:youtube\.com\/watch\?.*v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if (ytStd) return { type: 'iframe', embedUrl: `https://www.youtube.com/embed/${ytStd[1]}?autoplay=1&rel=0&modestbranding=1` };
+
   // YouTube Shorts
-  const shortsMatch = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
-  if (shortsMatch) {
-    return { type: 'youtube', embedUrl: `https://www.youtube.com/embed/${shortsMatch[1]}?autoplay=1&rel=0` };
-  }
+  const ytShorts = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
+  if (ytShorts) return { type: 'iframe', embedUrl: `https://www.youtube.com/embed/${ytShorts[1]}?autoplay=1&rel=0` };
+
+  // YouTube embed (already an embed URL)
+  const ytEmbed = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+  if (ytEmbed) return { type: 'iframe', embedUrl: url };
+
   // Twitch channel
-  const twitchChannel = url.match(/twitch\.tv\/([a-zA-Z0-9_]+)(?:\?|$)/);
-  if (twitchChannel && !url.includes('/videos/')) {
-    return { type: 'twitch', embedUrl: `https://player.twitch.tv/?channel=${twitchChannel[1]}&parent=${location.hostname}&autoplay=true` };
+  const twitchCh = url.match(/twitch\.tv\/([a-zA-Z0-9_]+)(?:[?#]|$)/);
+  if (twitchCh && !url.includes('/videos/') && !url.includes('/clips/')) {
+    return { type: 'iframe', embedUrl: `https://player.twitch.tv/?channel=${twitchCh[1]}&parent=${location.hostname}&autoplay=true` };
   }
+
   // Twitch VOD
   const twitchVod = url.match(/twitch\.tv\/videos\/(\d+)/);
-  if (twitchVod) {
-    return { type: 'twitch', embedUrl: `https://player.twitch.tv/?video=${twitchVod[1]}&parent=${location.hostname}&autoplay=true` };
-  }
+  if (twitchVod) return { type: 'iframe', embedUrl: `https://player.twitch.tv/?video=${twitchVod[1]}&parent=${location.hostname}&autoplay=true` };
+
+  // Twitch clip
+  const twitchClip = url.match(/twitch\.tv\/\w+\/clip\/([a-zA-Z0-9_-]+)/);
+  if (twitchClip) return { type: 'iframe', embedUrl: `https://clips.twitch.tv/embed?clip=${twitchClip[1]}&parent=${location.hostname}&autoplay=true` };
+
   // Vimeo
   const vimeo = url.match(/vimeo\.com\/(\d+)/);
-  if (vimeo) {
-    return { type: 'vimeo', embedUrl: `https://player.vimeo.com/video/${vimeo[1]}?autoplay=1` };
+  if (vimeo) return { type: 'iframe', embedUrl: `https://player.vimeo.com/video/${vimeo[1]}?autoplay=1&dnt=1` };
+
+  // Dailymotion
+  const dm = url.match(/dailymotion\.com\/video\/([a-zA-Z0-9]+)/);
+  if (dm) return { type: 'iframe', embedUrl: `https://www.dailymotion.com/embed/video/${dm[1]}?autoplay=1` };
+
+  // Rumble embed
+  const rumble = url.match(/rumble\.com\/embed\/([a-zA-Z0-9]+)/);
+  if (rumble) return { type: 'iframe', embedUrl: url };
+
+  // Rumble watch page
+  const rumbleWatch = url.match(/rumble\.com\/v([a-zA-Z0-9]+)/);
+  if (rumbleWatch) return { type: 'iframe', embedUrl: `https://rumble.com/embed/v${rumbleWatch[1]}/` };
+
+  // Odysee / LBRY
+  const odysee = url.match(/odysee\.com\/@[^/]+\/([^/?#]+)/);
+  if (odysee) return { type: 'iframe', embedUrl: `https://odysee.com/$/embed/@${odysee[0].split('@')[1]}` };
+
+  // Direct video files (MP4, WebM, OGG, MKV)
+  if (/\.(mp4|webm|ogg|ogv|mkv)(\?|$)/i.test(url)) {
+    return { type: 'video', embedUrl: url };
   }
-  // Direct iframe-able URL
-  if (url.startsWith('http')) {
-    return { type: 'direct', embedUrl: url };
+
+  // HLS streams (.m3u8)
+  if (/\.m3u8(\?|$)/i.test(url)) {
+    return { type: 'hls', embedUrl: url };
   }
+
+  // Generic http(s) — try as iframe
+  if (/^https?:\/\//.test(url)) {
+    return { type: 'iframe', embedUrl: url };
+  }
+
   return null;
 }
 
 function loadMedia(media) {
   const iframe = document.getElementById('media-iframe');
+  const video = document.getElementById('media-video');
   const placeholder = document.getElementById('media-placeholder');
-  if (!media || !media.url) {
-    iframe.style.display = 'none';
-    iframe.src = '';
-    placeholder.style.display = 'flex';
-    return;
-  }
+
+  // Hide all
+  iframe.style.display = 'none';
+  iframe.src = 'about:blank';
+  video.style.display = 'none';
+  video.src = '';
+  placeholder.style.display = 'flex';
+
+  if (!media || !media.url) return;
+
   const parsed = parseMediaUrl(media.url);
-  if (parsed) {
+  if (!parsed) { showToast('Could not embed that URL'); return; }
+
+  if (parsed.type === 'video' || parsed.type === 'hls') {
+    placeholder.style.display = 'none';
+    video.style.display = 'block';
+    video.src = parsed.embedUrl;
+
+    // Sync position for native video
+    if (media.positionSetAt) {
+      const elapsed = (Date.now() - media.positionSetAt) / 1000;
+      const pos = media.playing ? (media.position || 0) + elapsed : (media.position || 0);
+      video.addEventListener('loadedmetadata', () => {
+        video.currentTime = pos;
+        if (media.playing) video.play().catch(() => {});
+      }, { once: true });
+    }
+
+    // Broadcast play/pause/seek events
+    attachVideoSync(video);
+  } else {
+    placeholder.style.display = 'none';
     iframe.src = parsed.embedUrl;
     iframe.style.display = 'block';
-    placeholder.style.display = 'none';
-  } else {
-    showToast('Could not embed that URL');
   }
+}
+
+function attachVideoSync(video) {
+  video._syncHandlersAttached = video._syncHandlersAttached || false;
+  if (video._syncHandlersAttached) return;
+  video._syncHandlersAttached = true;
+
+  video.addEventListener('play', () => {
+    if (isSyncingVideo) return;
+    socket && socket.emit('media_play', { position: video.currentTime });
+  });
+
+  video.addEventListener('pause', () => {
+    if (isSyncingVideo) return;
+    socket && socket.emit('media_pause', { position: video.currentTime });
+  });
+
+  video.addEventListener('seeked', () => {
+    if (isSyncingVideo) return;
+    socket && socket.emit('media_seek', { position: video.currentTime });
+  });
+}
+
+function applyVideoSync(data) {
+  const video = document.getElementById('media-video');
+  if (video.style.display === 'none') return;
+  isSyncingVideo = true;
+  const elapsed = (Date.now() - data.positionSetAt) / 1000;
+  const targetPos = data.playing ? data.position + elapsed : data.position;
+  if (Math.abs(video.currentTime - targetPos) > 1.5) {
+    video.currentTime = targetPos;
+  }
+  if (data.playing && video.paused) video.play().catch(() => {});
+  if (!data.playing && !video.paused) video.pause();
+  setTimeout(() => { isSyncingVideo = false; }, 500);
 }
 
 function setMedia() {
@@ -771,41 +924,77 @@ function setMedia() {
   if (!url) return;
   const parsed = parseMediaUrl(url);
   if (!parsed) { showToast('Unsupported URL format'); return; }
-  wsSend({ type: 'set_media', url, mediaType: parsed.type });
+  socket && socket.emit('set_media', { url, mediaType: parsed.type });
   document.getElementById('media-url').value = '';
 }
 
 function clearMedia() {
-  wsSend({ type: 'clear_media' });
+  socket && socket.emit('clear_media');
 }
 
-// ── CHAT ──
+// ── CHAT / MESSAGE GROUPING ──
 function appendMessage(msg) {
   const box = document.getElementById('chat-messages');
-  const div = document.createElement('div');
-  div.className = 'msg' + (msg.system ? ' system' : '') + (msg.userId === myUser?.id ? ' own' : '');
+  const isBottom = box.scrollHeight - box.clientHeight - box.scrollTop < 60;
 
   if (msg.system) {
-    div.innerHTML = `<div class="msg-text">${sanitize(msg.text)}</div>`;
+    const div = document.createElement('div');
+    div.className = 'msg-system';
+    div.textContent = msg.text;
+    box.appendChild(div);
   } else {
-    div.innerHTML = `
-      <div class="msg-meta">
-        <span class="msg-name" style="color:${msg.color}">${sanitize(msg.username)}</span>
-        <span class="msg-time">${fmtTime(msg.timestamp)}</span>
-      </div>
-      <div class="msg-text">${sanitize(msg.text)}</div>
-    `;
+    const isOwn = msg.userId === myUser?.id;
+    const now = msg.timestamp;
+    const sameGroup = msg.userId === lastSenderId && (now - lastSenderTimestamp) < GROUP_TIMEOUT;
+
+    if (!sameGroup) {
+      // New group — show name header
+      const group = document.createElement('div');
+      group.className = 'msg-group';
+      group.dataset.uid = msg.userId;
+
+      const header = document.createElement('div');
+      header.className = 'msg-group-header';
+      header.innerHTML = `
+        <span class="msg-group-name" style="color:${msg.color}">${sanitize(msg.username)}</span>
+        <span class="msg-group-time">${fmtTime(now)}</span>
+      `;
+      group.appendChild(header);
+
+      const bubble = document.createElement('div');
+      bubble.className = `msg-bubble${isOwn ? ' own-bubble' : ''}`;
+      bubble.textContent = msg.text;
+      group.appendChild(bubble);
+
+      box.appendChild(group);
+      lastSenderId = msg.userId;
+      lastSenderTimestamp = now;
+    } else {
+      // Same sender within window — just append bubble to last group
+      const groups = box.querySelectorAll('.msg-group');
+      const lastGroup = groups[groups.length - 1];
+      if (lastGroup && lastGroup.dataset.uid === msg.userId) {
+        const bubble = document.createElement('div');
+        bubble.className = `msg-bubble msg-continuation${isOwn ? ' own-bubble' : ''}`;
+        bubble.textContent = msg.text;
+        lastGroup.appendChild(bubble);
+        lastSenderTimestamp = now;
+      } else {
+        // Safety fallback — same uid but group not last, start fresh
+        appendMessage({ ...msg, _forceNew: true });
+        return;
+      }
+    }
   }
 
-  box.appendChild(div);
-  box.scrollTop = box.scrollHeight;
+  if (isBottom) box.scrollTop = box.scrollHeight;
 }
 
 function sendChat() {
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
-  if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
-  wsSend({ type: 'chat', text });
+  if (!text || !socket?.connected) return;
+  socket.emit('chat', { text });
   input.value = '';
 }
 
@@ -821,83 +1010,85 @@ function renderUsers(users) {
 function toggleUsers() {
   usersShown = !usersShown;
   document.getElementById('users-list').classList.toggle('show', usersShown);
-  document.getElementById('users-toggle').textContent = usersShown ? '👥 Hide Users' : '👥 Show Users';
+  document.getElementById('users-toggle').textContent = usersShown ? '👥 Hide' : '👥 Users';
 }
 
-// ── WS ──
-function wsSend(data) {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(data));
-  }
-}
+// ── SOCKET.IO ──
+function connectSocket(roomId, password, username) {
+  if (socket) { socket.disconnect(); socket = null; }
 
-function setConnStatus(status) {
-  const el = document.getElementById('conn-status');
-  el.className = `conn-status ${status}`;
-  el.textContent = status;
-}
+  setConnBadge('connecting');
 
-function connectWS(roomId, password, username) {
-  if (ws) { ws.close(); ws = null; }
-  setConnStatus('connecting');
-  ws = new WebSocket(WS_URL);
+  socket = io({
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 8000,
+    timeout: 20000,
+    transports: ['websocket', 'polling']
+  });
 
-  ws.onopen = () => {
-    setConnStatus('connected');
-    wsSend({ type: 'join', roomId, password, username });
-    // ping keepalive
-    clearInterval(pingInterval);
-    pingInterval = setInterval(() => wsSend({ type: 'ping' }), 25000);
-  };
+  socket.on('connect', () => {
+    setConnBadge('connected');
+    socket.emit('join', { roomId, password, username });
+  });
 
-  ws.onmessage = (e) => {
-    let msg;
-    try { msg = JSON.parse(e.data); } catch { return; }
-    handleMessage(msg);
-  };
+  socket.on('disconnect', (reason) => {
+    setConnBadge('reconnecting');
+    console.log('Disconnected:', reason);
+  });
 
-  ws.onclose = () => {
-    setConnStatus('disconnected');
-    clearInterval(pingInterval);
-    // auto-reconnect
-    if (currentRoomId) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = setTimeout(() => {
-        connectWS(currentRoomId, currentPassword, myUser?.name || 'Guest');
-      }, 3000);
+  socket.on('connect_error', () => setConnBadge('reconnecting'));
+
+  socket.on('reconnect', () => {
+    setConnBadge('connected');
+    // Rejoin room on reconnect
+    socket.emit('join', { roomId, password, username: myUser?.name || username });
+  });
+
+  socket.on('room_state', (data) => {
+    myUser = data.user;
+    // Reset chat
+    document.getElementById('chat-messages').innerHTML = '';
+    lastSenderId = null;
+    lastSenderTimestamp = 0;
+    data.messages.forEach(appendMessage);
+    renderUsers(data.users);
+    loadMedia(data.media);
+    // Request precise sync after loading
+    if (data.media) {
+      setSyncBadge(true);
+      setTimeout(() => {
+        socket.emit('request_sync');
+        setSyncBadge(false);
+      }, 1500);
     }
-  };
+  });
 
-  ws.onerror = () => setConnStatus('disconnected');
-}
+  socket.on('chat', appendMessage);
 
-function handleMessage(msg) {
-  switch (msg.type) {
-    case 'room_state':
-      myUser = msg.user;
-      loadMedia(msg.media);
-      document.getElementById('chat-messages').innerHTML = '';
-      msg.messages.forEach(appendMessage);
-      renderUsers(msg.users);
-      break;
+  socket.on('media_changed', ({ media }) => {
+    loadMedia(media);
+    if (media) {
+      setSyncBadge(true);
+      setTimeout(() => {
+        socket.emit('request_sync');
+        setSyncBadge(false);
+      }, 1000);
+    }
+  });
 
-    case 'chat':
-      appendMessage(msg);
-      break;
+  socket.on('media_sync', (data) => {
+    applyVideoSync(data);
+  });
 
-    case 'media_changed':
-      loadMedia(msg.media);
-      break;
+  socket.on('user_joined', ({ users }) => renderUsers(users));
+  socket.on('user_left', ({ users }) => renderUsers(users));
 
-    case 'user_joined':
-    case 'user_left':
-      renderUsers(msg.users);
-      break;
-
-    case 'error':
-      showToast('Error: ' + msg.message);
-      break;
-  }
+  socket.on('error', ({ message }) => {
+    showToast('Error: ' + message);
+    setError('join-error', message);
+  });
 }
 
 // ── ROOM LIFECYCLE ──
@@ -916,7 +1107,7 @@ async function createRoom() {
   btn.innerHTML = '<span class="spinner"></span>Creating…';
 
   try {
-    const res = await fetch(`${API}/api/rooms`, {
+    const res = await fetch('/api/rooms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ roomId, password })
@@ -928,7 +1119,7 @@ async function createRoom() {
     setError('create-error', 'Server error. Try again.');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = 'Create Room';
+    btn.textContent = 'Create Room';
   }
 }
 
@@ -946,7 +1137,7 @@ async function joinRoom() {
   btn.innerHTML = '<span class="spinner"></span>Joining…';
 
   try {
-    const res = await fetch(`${API}/api/rooms/${encodeURIComponent(roomId)}/join`, {
+    const res = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password })
@@ -958,34 +1149,33 @@ async function joinRoom() {
     setError('join-error', 'Server error. Try again.');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = 'Join Room';
+    btn.textContent = 'Join Room';
   }
 }
 
 function enterRoom(roomId, password, username) {
   currentRoomId = roomId;
   currentPassword = password;
+  currentUsername = username;
   document.getElementById('room-id-display').textContent = '#' + roomId;
   document.getElementById('landing').style.display = 'none';
   document.getElementById('room').classList.add('active');
-  connectWS(roomId, password, username);
-
-  // Check URL for share
+  connectSocket(roomId, password, username);
   history.pushState({}, '', `?room=${encodeURIComponent(roomId)}`);
 }
 
 function leaveRoom() {
-  currentRoomId = null;
-  currentPassword = null;
-  myUser = null;
-  clearTimeout(reconnectTimer);
-  clearInterval(pingInterval);
-  if (ws) { ws.close(); ws = null; }
+  if (socket) { socket.disconnect(); socket = null; }
+  currentRoomId = null; currentPassword = null; myUser = null; currentUsername = null;
+  lastSenderId = null; lastSenderTimestamp = 0;
   document.getElementById('room').classList.remove('active');
   document.getElementById('landing').style.display = 'flex';
   document.getElementById('chat-messages').innerHTML = '';
-  document.getElementById('media-iframe').src = '';
-  document.getElementById('media-iframe').style.display = 'none';
+  const iframe = document.getElementById('media-iframe');
+  iframe.src = 'about:blank'; iframe.style.display = 'none';
+  const video = document.getElementById('media-video');
+  video.src = ''; video.style.display = 'none';
+  video._syncHandlersAttached = false;
   document.getElementById('media-placeholder').style.display = 'flex';
   history.pushState({}, '', '/');
 }
@@ -995,21 +1185,21 @@ function copyRoomLink() {
   navigator.clipboard.writeText(url).then(() => showToast('Room link copied!'));
 }
 
-// ── INIT: check URL params ──
+// ── INIT ──
 (function init() {
   const params = new URLSearchParams(location.search);
   const roomFromUrl = params.get('room');
   if (roomFromUrl) {
     document.getElementById('join-room-id').value = roomFromUrl;
-    document.getElementById('join-password').focus();
+    setTimeout(() => document.getElementById('join-password').focus(), 100);
   }
-  // Enter key shortcuts on landing
-  ['create-room-id','create-password','create-username'].forEach(id => {
-    document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Enter') createRoom(); });
-  });
-  ['join-room-id','join-password','join-username'].forEach(id => {
-    document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Enter') joinRoom(); });
-  });
+
+  ['create-room-id','create-password','create-username'].forEach(id =>
+    document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Enter') createRoom(); })
+  );
+  ['join-room-id','join-password','join-username'].forEach(id =>
+    document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Enter') joinRoom(); })
+  );
 })();
 </script>
 </body>

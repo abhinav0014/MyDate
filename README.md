@@ -1,25 +1,31 @@
-# LiveRoom 🎬
+# LiveRoom v2 🎬
 
-Watch YouTube & streams together with real-time chat. No database required — all state is held in memory.
+Watch YouTube, Twitch, Vimeo, MP4s and more together — perfectly in sync, with real-time chat.
 
-## Features
-- 🔐 Create private rooms with ID + password
-- 🎬 Embed YouTube, Twitch, Vimeo, or any iframe-able stream
-- 💬 Real-time chat via WebSockets (multiple users)
-- 👥 Live user presence list
-- 🔗 Shareable room links
-- 📱 Fully responsive (mobile + desktop)
-- 🐳 Zero-DB Docker deployment
-- ♻️ Auto-reconnect on disconnect
+## What's New in v2
+- **Socket.IO** — persistent, auto-reconnecting connections (no manual refresh needed)
+- **Media sync** — server tracks playback position; latecomers join at the right timestamp
+- **Play/pause/seek sync** — control events broadcast to all viewers (native video)
+- **Grouped messages** — consecutive messages from same user collapse (Discord-style)
+- **Broader platform support** — YouTube, Twitch, Vimeo, Dailymotion, Rumble, Odysee, MP4/WebM, HLS (.m3u8), any iframe URL
+- **Connection badge** — shows connected / reconnecting / disconnected in real time
+- **Sync badge** — visible indicator when syncing media state after joining
 
-## Supported Media URLs
-| Platform | Example |
-|----------|---------|
-| YouTube  | `https://youtube.com/watch?v=VIDEO_ID` |
-| YouTube  | `https://youtu.be/VIDEO_ID` |
-| Twitch   | `https://twitch.tv/channelname` |
-| Vimeo    | `https://vimeo.com/123456789` |
-| Direct   | Any iframe-embeddable URL |
+## Supported Media
+| Platform     | Example |
+|-------------|---------|
+| YouTube     | `https://youtube.com/watch?v=VIDEO_ID` |
+| YouTube Shorts | `https://youtube.com/shorts/VIDEO_ID` |
+| Twitch Live | `https://twitch.tv/channelname` |
+| Twitch VOD  | `https://twitch.tv/videos/123456` |
+| Twitch Clip | `https://twitch.tv/channel/clip/ClipID` |
+| Vimeo       | `https://vimeo.com/123456789` |
+| Dailymotion | `https://dailymotion.com/video/x7abc` |
+| Rumble      | `https://rumble.com/embed/XXXXX` |
+| Odysee      | `https://odysee.com/@channel/video` |
+| Direct MP4  | `https://example.com/video.mp4` |
+| HLS Stream  | `https://example.com/stream.m3u8` |
+| Any URL     | Any iframe-embeddable URL |
 
 ## Quick Start
 
@@ -31,34 +37,21 @@ docker compose up -d
 ```
 Open http://localhost:3000
 
-### Docker only
-```bash
-docker build -t liveroom .
-docker run -d -p 3000:3000 --name liveroom liveroom
-```
-
 ### Local dev
 ```bash
 cd server
 npm install
 node index.js
 ```
-Open http://localhost:3000
-
-## Usage
-1. **Create Room** — pick a unique Room ID and set a password
-2. **Share** — click the Share button to copy an invite link
-3. **Others join** — share the link; guests enter the same password
-4. **Paste a URL** — YouTube/Twitch/Vimeo URL in the media bar → Play
-5. **Chat** — type in the chat panel, all room members see it live
 
 ## Architecture
-- **Backend**: Node.js + Express + `ws` (WebSocket)
-- **Frontend**: Vanilla HTML/CSS/JS (served as static files)
-- **State**: In-memory Maps (rooms auto-clean after 10 min of inactivity)
-- **No DB**: Rooms live only while the server runs; this is intentional for simplicity
+- **Backend**: Node.js + Express + Socket.IO
+- **Frontend**: Vanilla HTML/CSS/JS
+- **State**: In-memory (rooms auto-clean 10 min after last user leaves)
+- **Sync**: Server stores `position + positionSetAt` timestamp; clients compute current position on join
+- **Reconnection**: Socket.IO handles auto-reconnect with exponential backoff; room rejoin is automatic
 
 ## Notes
-- Rooms are automatically deleted 10 minutes after the last user leaves
-- Max chat history kept in memory: 200 messages per room
-- YouTube's embed API requires `autoplay=1` — some browsers may block autoplay until user interaction
+- Native video sync (MP4/HLS) propagates play/pause/seek to all viewers
+- iFrame embeds (YouTube etc.) can't be controlled cross-origin — sync is positional only at join time
+- Max 200 messages per room in memory; last 100 shown on join
