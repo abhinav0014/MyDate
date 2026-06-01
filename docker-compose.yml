@@ -1,17 +1,56 @@
 version: '3.8'
 
 services:
-  liveroom:
-    build: .
-    container_name: liveroom
+  # ── Shared virtual browser ──
+  browser:
+    build:
+      context: ./browser
+      dockerfile: Dockerfile
+    container_name: liveroom-browser
+    environment:
+      - DISPLAY_NUM=99
+      - SCREEN_RES=1280x720x24
+      - VNC_PORT=5900
+      - NOVNC_PORT=6080
+      - VNC_PASS=liveroom
+      - START_URL=https://www.youtube.com
+    # noVNC and VNC ports are NOT exposed to the host —
+    # all access goes through the Node proxy for security
+    expose:
+      - "6080"
+      - "5900"
+    shm_size: '256mb'
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── LiveRoom app server ──
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: liveroom-app
     ports:
       - "3000:3000"
     environment:
       - PORT=3000
       - NODE_ENV=production
+      - NOVNC_HOST=browser
+      - NOVNC_PORT=6080
+    depends_on:
+      browser:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+networks:
+  default:
+    name: liveroom-net
