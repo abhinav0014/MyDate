@@ -15,13 +15,13 @@ RUN apt-get update && apt-get install -y \
 # Install websockify via pip (provides the `websockify` binary on PATH)
 RUN pip3 install websockify
 
-# Install noVNC (static files only — no websockify tarball needed)
+# Install noVNC (static files only)
 RUN mkdir -p /opt/novnc && \
     wget -qO- https://github.com/novnc/noVNC/archive/refs/tags/v1.4.0.tar.gz \
       | tar xz --strip-components=1 -C /opt/novnc
 
-# Verify websockify is callable
-RUN which websockify && websockify --version
+# Verify websockify is on PATH
+RUN which websockify
 
 # Openbox config — borderless, maximized
 RUN mkdir -p /root/.config/openbox
