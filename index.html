@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BrowserVM Rooms</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="/socket.io/socket.io.js"></script>
+<style>
+/* ─── RESET & TOKENS ─────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#07090d;
+  --s1:#0d1117;
+  --s2:#111820;
+  --s3:#172031;
+  --border:#1e2d42;
+  --border2:#253547;
+  --accent:#00d4ff;
+  --a2:#7b61ff;
+  --a3:#00ff88;
+  --warn:#ffb830;
+  --danger:#ff4757;
+  --text:#c9d8e8;
+  --dim:#4a6580;
+  --mono:'JetBrains Mono',monospace;
+  --display:'Syne',sans-serif;
+  --radius:8px;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--mono)}
+
+/* ─── SCROLLBAR ──────────────────────────────────────────── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ─── NOISE OVERLAY ─────────────────────────────────────── */
+body::after{
+  content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9998;opacity:0.4;
+}
+
+/* ─── VIEWS ─────────────────────────────────────────────── */
+.view{display:none;height:100%}
+.view.active{display:flex}
+
+/* ════════════════════════════════════════════════════════════
+   LOBBY
+═══════════════════════════════════════════════════════════ */
+#lobbyView{
+  flex-direction:column;align-items:center;justify-content:flex-start;
+  overflow-y:auto;padding:40px 20px 60px;
+  background:radial-gradient(ellipse 60% 40% at 50% 0%, rgba(0,212,255,0.06) 0%, transparent 70%);
+}
+
+.lobby-hero{text-align:center;margin-bottom:40px}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  border:1px solid var(--border2);border-radius:20px;
+  padding:4px 14px;font-size:11px;color:var(--dim);
+  margin-bottom:20px;letter-spacing:.08em;text-transform:uppercase;
+}
+.hero-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--a3);box-shadow:0 0 6px var(--a3);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+.hero-title{
+  font-family:var(--display);font-size:clamp(28px,5vw,52px);font-weight:800;
+  line-height:1.1;color:#fff;margin-bottom:12px;
+}
+.hero-title span{
+  background:linear-gradient(135deg,var(--accent),var(--a2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hero-sub{font-size:13px;color:var(--dim);max-width:480px;margin:0 auto;line-height:1.7}
+
+/* lobby layout */
+.lobby-grid{
+  display:grid;grid-template-columns:340px 1fr;gap:24px;
+  width:100%;max-width:1100px;
+}
+@media(max-width:800px){.lobby-grid{grid-template-columns:1fr}}
+
+/* card */
+.card{
+  background:var(--s1);border:1px solid var(--border);border-radius:var(--radius);
+  overflow:hidden;
+}
+.card-head{
+  padding:14px 18px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+  font-family:var(--display);font-size:13px;font-weight:700;color:#fff;
+}
+.card-head .icon{font-size:15px}
+.card-body{padding:18px}
+
+/* form */
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.field:last-child{margin-bottom:0}
+label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim)}
+input[type=text],input[type=password]{
+  background:var(--bg);border:1px solid var(--border);border-radius:5px;
+  color:var(--text);font-family:var(--mono);font-size:12px;
+  padding:8px 12px;outline:none;transition:border-color .2s;
+  width:100%;
+}
+input:focus{border-color:var(--accent)}
+input::placeholder{color:var(--dim)}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  border-radius:6px;font-family:var(--display);font-weight:700;
+  font-size:13px;cursor:pointer;transition:all .2s;border:none;
+  letter-spacing:.04em;padding:10px 20px;
+}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--a2));color:var(--bg);width:100%}
+.btn-primary:hover{opacity:.85;transform:translateY(-1px)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--dim)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-sm{font-size:11px;padding:5px 12px}
+.btn-danger{background:rgba(255,71,87,.15);border:1px solid rgba(255,71,87,.3);color:var(--danger)}
+.btn-danger:hover{background:rgba(255,71,87,.25)}
+
+/* rooms list */
+.rooms-list{display:flex;flex-direction:column;gap:8px;max-height:480px;overflow-y:auto;padding-right:4px}
+.room-card{
+  background:var(--s2);border:1px solid var(--border);border-radius:6px;
+  padding:12px 14px;cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;gap:12px;
+}
+.room-card:hover{border-color:var(--accent);background:var(--s3)}
+.room-card .rc-info{flex:1;min-width:0}
+.room-card .rc-name{
+  font-family:var(--display);font-size:13px;font-weight:700;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.room-card .rc-meta{font-size:10px;color:var(--dim);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap}
+.room-card .rc-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.user-count{
+  display:flex;align-items:center;gap:4px;font-size:11px;color:var(--dim);
+}
+.status-pill{
+  padding:2px 8px;border-radius:3px;font-size:9px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.06em;
+}
+.pill-ready{background:rgba(0,255,136,.12);color:var(--a3)}
+.pill-starting{background:rgba(255,184,48,.12);color:var(--warn)}
+.pill-error{background:rgba(255,71,87,.12);color:var(--danger)}
+.lock-icon{font-size:11px;color:var(--dim)}
+.empty-rooms{
+  text-align:center;padding:40px 20px;color:var(--dim);font-size:12px;line-height:1.8;
+}
+
+/* join modal */
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(0,0,0,.7);
+  display:none;align-items:center;justify-content:center;z-index:1000;
+  backdrop-filter:blur(4px);
+}
+.modal-backdrop.open{display:flex}
+.modal{
+  background:var(--s1);border:1px solid var(--border2);
+  border-radius:10px;width:340px;overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
+  animation:slideUp .2s ease;
+}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-head{
+  padding:16px 20px;border-bottom:1px solid var(--border);
+  font-family:var(--display);font-size:14px;font-weight:700;color:#fff;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.modal-close{background:none;border:none;color:var(--dim);font-size:20px;cursor:pointer;line-height:1}
+.modal-body{padding:20px}
+
+/* toast */
+.toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--s2);border:1px solid var(--border2);border-radius:6px;
+  color:var(--text);font-size:12px;padding:10px 20px;z-index:9999;
+  box-shadow:0 8px 30px rgba(0,0,0,.4);transition:transform .3s ease,opacity .3s ease;
+  opacity:0;white-space:nowrap;max-width:90vw;text-align:center;
+}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+/* ════════════════════════════════════════════════════════════
+   ROOM VIEW
+═══════════════════════════════════════════════════════════ */
+#roomView{flex-direction:column;height:100%}
+
+/* room topbar */
+.room-bar{
+  background:var(--s1);border-bottom:1px solid var(--border);
+  height:48px;display:flex;align-items:center;
+  padding:0 16px;gap:12px;flex-shrink:0;
+}
+.rb-back{
+  background:none;border:1px solid var(--border);border-radius:5px;
+  color:var(--dim);font-size:11px;font-family:var(--mono);
+  padding:4px 10px;cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;gap:4px;
+}
+.rb-back:hover{border-color:var(--danger);color:var(--danger)}
+.rb-name{
+  font-family:var(--display);font-size:14px;font-weight:700;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;
+}
+.rb-sep{width:1px;height:20px;background:var(--border)}
+
+.rb-status{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim)}
+.rb-dot{width:7px;height:7px;border-radius:50%}
+.rb-dot.ready{background:var(--a3);box-shadow:0 0 6px var(--a3);animation:blink 2s infinite}
+.rb-dot.starting{background:var(--warn);animation:blink 1s infinite}
+.rb-dot.error{background:var(--danger)}
+
+.rb-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.ctrl-tag{
+  display:flex;align-items:center;gap:5px;
+  padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600;
+  background:rgba(0,212,255,.1);color:var(--accent);border:1px solid rgba(0,212,255,.2);
+}
+.ctrl-tag.viewer{background:rgba(123,97,255,.1);color:var(--a2);border-color:rgba(123,97,255,.2)}
+
+/* room body */
+.room-body{flex:1;display:flex;overflow:hidden}
+
+/* VNC panel */
+.vnc-panel{
+  flex:1;display:flex;flex-direction:column;overflow:hidden;
+  background:#000;position:relative;
+}
+
+/* noVNC iframe */
+#vncFrame{width:100%;height:100%;border:none;display:block}
+
+/* vnc overlay */
+.vnc-wait{
+  position:absolute;inset:0;background:rgba(7,9,13,.93);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;transition:opacity .4s;
+}
+.vnc-wait.hidden{opacity:0;pointer-events:none}
+.spinner{
+  width:40px;height:40px;border:3px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.wait-title{font-family:var(--display);font-size:18px;font-weight:700;color:#fff}
+.wait-sub{font-size:11px;color:var(--dim);text-align:center;line-height:1.7}
+
+/* viewer overlay (when not in control) */
+.viewer-overlay{
+  position:absolute;inset:0;z-index:10;cursor:not-allowed;
+  /* transparent but blocks clicks */
+  background:transparent;display:none;
+}
+.viewer-overlay.active{display:block}
+
+/* viewer banner */
+.viewer-banner{
+  position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+  background:rgba(13,17,23,.9);border:1px solid var(--border2);border-radius:8px;
+  padding:10px 20px;z-index:20;display:none;
+  flex-direction:column;align-items:center;gap:8px;
+  backdrop-filter:blur(6px);
+}
+.viewer-banner.show{display:flex}
+.vb-text{font-size:12px;color:var(--dim);text-align:center}
+.vb-text strong{color:#fff}
+
+/* sidebar */
+.room-sidebar{
+  width:260px;flex-shrink:0;background:var(--s1);
+  border-left:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+
+/* tabs */
+.sidebar-tabs{
+  display:flex;border-bottom:1px solid var(--border);
+}
+.stab{
+  flex:1;padding:10px;font-size:11px;font-family:var(--mono);
+  text-align:center;cursor:pointer;color:var(--dim);
+  border-bottom:2px solid transparent;transition:all .15s;
+  letter-spacing:.05em;text-transform:uppercase;
+}
+.stab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+.tab-pane{display:none;flex:1;flex-direction:column;overflow:hidden}
+.tab-pane.active{display:flex}
+
+/* users tab */
+.users-list{flex:1;overflow-y:auto;padding:10px}
+.user-item{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 10px;border-radius:6px;margin-bottom:4px;
+  background:var(--s2);border:1px solid var(--border);
+  transition:border-color .15s;
+}
+.user-item.me{border-color:var(--border2)}
+.user-avatar{
+  width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;font-family:var(--display);
+  flex-shrink:0;
+}
+.user-info{flex:1;min-width:0}
+.user-name{font-size:12px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-role{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.user-ctrl-badge{
+  font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;
+  background:rgba(0,212,255,.15);color:var(--accent);flex-shrink:0;
+}
+
+.control-actions{padding:10px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px}
+
+/* chat tab */
+.chat-messages{
+  flex:1;overflow-y:auto;padding:10px;
+  display:flex;flex-direction:column;gap:8px;
+}
+.chat-msg{
+  display:flex;flex-direction:column;gap:2px;
+  padding:8px 10px;border-radius:6px;background:var(--s2);
+  border-left:3px solid transparent;
+}
+.chat-msg.system{
+  background:transparent;border-left-color:var(--border);
+  opacity:.6;
+}
+.chat-msg .cm-header{
+  display:flex;align-items:center;gap:6px;
+}
+.cm-name{font-size:11px;font-weight:600}
+.cm-time{font-size:9px;color:var(--dim)}
+.cm-text{font-size:12px;color:var(--text);line-height:1.5;word-break:break-word}
+
+.chat-input-wrap{
+  padding:10px;border-top:1px solid var(--border);
+  display:flex;gap:6px;
+}
+.chat-input{
+  flex:1;background:var(--bg);border:1px solid var(--border);
+  border-radius:5px;color:var(--text);font-family:var(--mono);
+  font-size:12px;padding:7px 10px;outline:none;
+  transition:border-color .2s;
+}
+.chat-input:focus{border-color:var(--accent)}
+.chat-send{
+  background:var(--accent);color:var(--bg);border:none;
+  border-radius:5px;padding:0 12px;font-family:var(--display);
+  font-weight:700;font-size:13px;cursor:pointer;transition:opacity .2s;
+}
+.chat-send:hover{opacity:.8}
+
+/* notification in chat */
+.chat-notif{
+  font-size:10px;color:var(--dim);text-align:center;
+  padding:4px 0;letter-spacing:.05em;
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ LOBBY ══════════════════════════════════════════════════════════════ -->
+<div id="lobbyView" class="view active">
+  <div class="lobby-hero">
+    <div class="hero-badge"><span class="dot"></span> Live Rooms</div>
+    <h1 class="hero-title">Browser<span>VM</span> Rooms</h1>
+    <p class="hero-sub">
+      Shared browser rooms — collaborate, stream, and surf together.
+      Each room runs a real Chromium browser in Docker.
+    </p>
+  </div>
+
+  <div class="lobby-grid">
+    <!-- Create room -->
+    <div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head"><span class="icon">👤</span> Your Profile</div>
+        <div class="card-body">
+          <div class="field">
+            <label>Display Name</label>
+            <input type="text" id="myName" placeholder="Enter your name…" maxlength="24" value=""/>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="icon">＋</span> Create Room</div>
+        <div class="card-body">
+          <div class="field">
+            <label>Room Name</label>
+            <input type="text" id="newRoomName" placeholder="My browser room…" maxlength="40"/>
+          </div>
+          <div class="field">
+            <label>Password (optional)</label>
+            <input type="password" id="newRoomPass" placeholder="Leave blank for public"/>
+          </div>
+          <button class="btn btn-primary" onclick="createRoom()">
+            <span>⏵</span> Launch Room
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rooms list -->
+    <div class="card">
+      <div class="card-head" style="justify-content:space-between">
+        <span style="display:flex;align-items:center;gap:8px"><span class="icon">🗂</span> Active Rooms</span>
+        <button class="btn btn-ghost btn-sm" onclick="loadRooms()">⟳ Refresh</button>
+      </div>
+      <div class="card-body" style="padding:12px">
+        <div class="rooms-list" id="roomsList">
+          <div class="empty-rooms">Loading rooms…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ JOIN MODAL ════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="joinModal">
+  <div class="modal">
+    <div class="modal-head">
+      Join Room
+      <button class="modal-close" onclick="closeJoinModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Your Name</label>
+        <input type="text" id="joinName" placeholder="Enter your name…" maxlength="24"/>
+      </div>
+      <div class="field" id="joinPassField" style="display:none">
+        <label>Password</label>
+        <input type="password" id="joinPass" placeholder="Room password…"/>
+      </div>
+      <div style="height:8px"></div>
+      <button class="btn btn-primary" onclick="confirmJoin()">Join Room</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ROOM VIEW ═════════════════════════════════════════════════════════ -->
+<div id="roomView" class="view">
+  <!-- top bar -->
+  <div class="room-bar">
+    <button class="rb-back" onclick="leaveRoom()">← Leave</button>
+    <div class="rb-sep"></div>
+    <div class="rb-name" id="rb-name">Room</div>
+    <div class="rb-sep"></div>
+    <div class="rb-status">
+      <div class="rb-dot starting" id="rb-dot"></div>
+      <span id="rb-status-text">Starting…</span>
+    </div>
+    <div class="rb-right">
+      <div class="ctrl-tag viewer" id="myRoleTag">👁 Viewing</div>
+    </div>
+  </div>
+
+  <!-- body -->
+  <div class="room-body">
+    <!-- VNC panel -->
+    <div class="vnc-panel">
+      <iframe id="vncFrame" src="" allowfullscreen></iframe>
+
+      <!-- waiting overlay -->
+      <div class="vnc-wait" id="vncWait">
+        <div class="spinner"></div>
+        <div class="wait-title">Starting VM…</div>
+        <div class="wait-sub" id="waitSub">
+          Launching Docker container.<br/>
+          This takes about 10–15 seconds.
+        </div>
+      </div>
+
+      <!-- viewer overlay (blocks input) -->
+      <div class="viewer-overlay" id="viewerOverlay"></div>
+
+      <!-- viewer banner -->
+      <div class="viewer-banner" id="viewerBanner">
+        <div class="vb-text">
+          <strong id="controllerName">Someone</strong> is in control
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="requestControl()">✋ Request Control</button>
+      </div>
+    </div>
+
+    <!-- sidebar -->
+    <div class="room-sidebar">
+      <div class="sidebar-tabs">
+        <div class="stab active" onclick="switchTab('users',this)">Users</div>
+        <div class="stab" onclick="switchTab('chat',this)">Chat</div>
+      </div>
+
+      <!-- users tab -->
+      <div class="tab-pane active" id="tab-users">
+        <div class="users-list" id="usersList"></div>
+        <div class="control-actions" id="controlActions">
+          <!-- populated dynamically -->
+        </div>
+      </div>
+
+      <!-- chat tab -->
+      <div class="tab-pane" id="tab-chat">
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-wrap">
+          <input class="chat-input" id="chatInput" placeholder="Say something…" maxlength="500"/>
+          <button class="chat-send" onclick="sendChat()">↑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ─── SOCKET ───────────────────────────────────────────────────────── */
+const socket = io();
+
+/* ─── STATE ────────────────────────────────────────────────────────── */
+let mySocketId   = null;
+let currentRoom  = null;  // { id, name, novncPort, hasPassword }
+let pendingJoin  = null;  // { roomId, hasPassword }
+let myRole       = 'viewer'; // 'controller' | 'viewer'
+let controllerId = null;
+let users        = [];
+let unreadChat   = 0;
+let activeTab    = 'users';
+
+/* ─── INIT ─────────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  loadRooms();
+  setInterval(loadRooms, 8000);
+
+  // default name from storage
+  const saved = localStorage.getItem('bvmName');
+  if (saved) {
+    document.getElementById('myName').value = saved;
+    document.getElementById('joinName').value = saved;
+  }
+
+  document.getElementById('myName').addEventListener('input', e => {
+    localStorage.setItem('bvmName', e.target.value);
+    document.getElementById('joinName').value = e.target.value;
+  });
+
+  document.getElementById('chatInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') sendChat();
+  });
+});
+
+/* ─── LOBBY API ─────────────────────────────────────────────────────── */
+async function loadRooms() {
+  try {
+    const res = await fetch('/api/rooms');
+    const list = await res.json();
+    renderRooms(list);
+  } catch(e) {
+    document.getElementById('roomsList').innerHTML =
+      `<div class="empty-rooms">⚠ Could not reach server</div>`;
+  }
+}
+
+function renderRooms(list) {
+  const el = document.getElementById('roomsList');
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-rooms">No rooms yet.<br/>Create one to get started.</div>`;
+    return;
+  }
+  el.innerHTML = list.map(r => `
+    <div class="room-card" onclick="openJoinModal('${r.id}', ${r.hasPassword})">
+      <div class="rc-info">
+        <div class="rc-name">${esc(r.name)}</div>
+        <div class="rc-meta">
+          <span>by ${esc(r.createdBy || 'unknown')}</span>
+          <span>${timeAgo(r.createdAt)}</span>
+        </div>
+      </div>
+      <div class="rc-right">
+        <span class="status-pill ${statusClass(r.status)}">${r.status}</span>
+        ${r.hasPassword ? '<span class="lock-icon">🔒</span>' : ''}
+        <div class="user-count">👥 ${r.userCount}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function statusClass(s) {
+  if (s === 'ready')    return 'pill-ready';
+  if (s === 'starting') return 'pill-starting';
+  return 'pill-error';
+}
+
+async function createRoom() {
+  const name = document.getElementById('newRoomName').value.trim();
+  const pass = document.getElementById('newRoomPass').value;
+  const creator = document.getElementById('myName').value.trim() || 'Anonymous';
+
+  if (!name) return toast('Enter a room name');
+  if (!creator) return toast('Enter your display name first');
+
+  const btn = document.querySelector('#lobbyView .btn-primary');
+  btn.disabled = true; btn.textContent = '⏳ Launching…';
+
+  try {
+    const res = await fetch('/api/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, password: pass || null, creatorName: creator })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'failed');
+
+    document.getElementById('newRoomName').value = '';
+    document.getElementById('newRoomPass').value = '';
+    await loadRooms();
+    // Auto-join the room we just created
+    openJoinModal(data.id, false, creator);
+  } catch(e) {
+    toast('Error: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '⏵ Launch Room';
+  }
+}
+
+/* ─── JOIN MODAL ────────────────────────────────────────────────────── */
+function openJoinModal(roomId, hasPassword, prefilledName) {
+  pendingJoin = { roomId, hasPassword };
+  const nameInput = document.getElementById('joinName');
+  nameInput.value = prefilledName || document.getElementById('myName').value || '';
+  document.getElementById('joinPassField').style.display = hasPassword ? 'block' : 'none';
+  document.getElementById('joinPass').value = '';
+  document.getElementById('joinModal').classList.add('open');
+  setTimeout(() => {
+    if (!nameInput.value) nameInput.focus();
+    else document.getElementById('joinPass').focus();
+  }, 100);
+}
+
+function closeJoinModal() {
+  document.getElementById('joinModal').classList.remove('open');
+  pendingJoin = null;
+}
+
+function confirmJoin() {
+  const name = document.getElementById('joinName').value.trim();
+  const pass = document.getElementById('joinPass').value;
+  if (!name) return toast('Enter your name');
+  if (pendingJoin?.hasPassword && !pass) return toast('Enter room password');
+  localStorage.setItem('bvmName', name);
+  closeJoinModal();
+  joinRoom(pendingJoin.roomId, name, pass);
+}
+
+/* ─── SOCKET JOIN ───────────────────────────────────────────────────── */
+function joinRoom(roomId, name, password) {
+  showView('room');
+  socket.emit('room:join', { roomId, name, password });
+}
+
+function leaveRoom() {
+  showView('lobby');
+  currentRoom = null;
+  myRole = 'viewer';
+  controllerId = null;
+  document.getElementById('vncFrame').src = '';
+  document.getElementById('vncWait').classList.remove('hidden');
+  document.getElementById('viewerBanner').classList.remove('show');
+  loadRooms();
+}
+
+/* ─── SOCKET EVENTS ─────────────────────────────────────────────────── */
+socket.on('connect', () => { mySocketId = socket.id; });
+
+socket.on('room:joined', (data) => {
+  currentRoom = { id: data.roomId, novncPort: data.novncPort };
+  controllerId = data.controllerId;
+  mySocketId = data.socketId;
+  users = data.users;
+
+  // Load chat history
+  const chatEl = document.getElementById('chatMessages');
+  chatEl.innerHTML = '';
+  (data.chatHistory || []).forEach(addChatMsg);
+
+  renderUsers();
+  updateControlUI();
+
+  if (data.status === 'ready') {
+    connectVNC(data.novncPort);
+  } else {
+    document.getElementById('vncWait').classList.remove('hidden');
+    document.getElementById('waitSub').textContent =
+      'Container is starting up…\nThis takes about 10–15 seconds.';
+  }
+});
+
+socket.on('room:ready', ({ novncPort }) => {
+  currentRoom.novncPort = novncPort;
+  connectVNC(novncPort);
+});
+
+socket.on('room:error', ({ message }) => {
+  document.getElementById('rb-dot').className = 'rb-dot error';
+  document.getElementById('rb-status-text').textContent = 'Error';
+  document.getElementById('waitSub').textContent = '⚠ ' + message;
+  document.querySelector('#vncWait .spinner').style.display = 'none';
+});
+
+socket.on('room:closed', ({ reason }) => {
+  toast(reason || 'Room closed');
+  leaveRoom();
+});
+
+socket.on('room:user_joined', ({ socketId, name, color, users: u }) => {
+  users = u;
+  renderUsers();
+  addSystemMsg(`${name} joined`);
+});
+
+socket.on('room:user_left', ({ socketId, name, controllerId: newCtrl, users: u }) => {
+  users = u;
+  controllerId = newCtrl;
+  renderUsers();
+  updateControlUI();
+  addSystemMsg(`${name} left`);
+});
+
+socket.on('room:control_changed', ({ controllerId: newCtrl, users: u }) => {
+  controllerId = newCtrl;
+  users = u;
+  const me = users.find(u => u.socketId === mySocketId);
+  myRole = me?.isController ? 'controller' : 'viewer';
+  renderUsers();
+  updateControlUI();
+  const ctrlUser = users.find(u => u.socketId === newCtrl);
+  if (myRole === 'controller') {
+    toast('✅ You now have control');
+    addSystemMsg('You are now in control');
+  } else if (ctrlUser) {
+    addSystemMsg(`${ctrlUser.name} took control`);
+  }
+});
+
+socket.on('room:control_requested', ({ fromId, fromName }) => {
+  // Ask current controller via toast + auto-grant after 5s if no action
+  const confirmed = confirm(
+    `${fromName} is requesting control of the browser.\n\nGrant control?`
+  );
+  if (confirmed) {
+    socket.emit('room:grant_control', { toId: fromId });
+  }
+});
+
+socket.on('chat:message', addChatMsg);
+
+socket.on('error', ({ message }) => toast('⚠ ' + message));
+
+/* ─── VNC CONNECT ───────────────────────────────────────────────────── */
+function connectVNC(novncPort) {
+  document.getElementById('rb-dot').className = 'rb-dot ready';
+  document.getElementById('rb-status-text').textContent = 'Ready';
+
+  // Build noVNC URL using our WS proxy path
+  const wsPath = encodeURIComponent(`/vnc/${currentRoom.id}/websockify`);
+  const host   = window.location.hostname;
+  const port   = window.location.port || 3000;
+
+  // Use noVNC hosted from container via our proxy, but point it at our WS proxy
+  const vncUrl =
+    `http://${host}:${port}/novnc/${currentRoom.id}/vnc.html` +
+    `?autoconnect=true&resize=scale&view_only=false` +
+    `&path=${wsPath}`;
+
+  document.getElementById('vncFrame').src = vncUrl;
+  document.getElementById('vncFrame').onload = () => {
+    document.getElementById('vncWait').classList.add('hidden');
+  };
+  // fallback hide after 3s
+  setTimeout(() => document.getElementById('vncWait').classList.add('hidden'), 3000);
+}
+
+/* ─── CONTROL ───────────────────────────────────────────────────────── */
+function requestControl() {
+  socket.emit('room:request_control');
+}
+
+function passControl() {
+  socket.emit('room:pass_control');
+}
+
+function updateControlUI() {
+  const me = users.find(u => u.socketId === mySocketId);
+  myRole = me?.isController ? 'controller' : 'viewer';
+
+  const roleTag     = document.getElementById('myRoleTag');
+  const viewerOvl   = document.getElementById('viewerOverlay');
+  const viewerBann  = document.getElementById('viewerBanner');
+  const ctrlActions = document.getElementById('controlActions');
+
+  if (myRole === 'controller') {
+    roleTag.className = 'ctrl-tag';
+    roleTag.textContent = '🎮 In Control';
+    viewerOvl.classList.remove('active');
+    viewerBann.classList.remove('show');
+    ctrlActions.innerHTML = `
+      <button class="btn btn-ghost btn-sm" onclick="passControl()" style="width:100%">
+        🤝 Pass Control
+      </button>`;
+  } else {
+    roleTag.className = 'ctrl-tag viewer';
+    roleTag.textContent = '👁 Viewing';
+    viewerOvl.classList.add('active');
+    const ctrl = users.find(u => u.socketId === controllerId);
+    if (ctrl) {
+      document.getElementById('controllerName').textContent = ctrl.name;
+      viewerBann.classList.add('show');
+    } else {
+      viewerBann.classList.remove('show');
+    }
+    ctrlActions.innerHTML = `
+      <button class="btn btn-primary btn-sm" onclick="requestControl()" style="width:100%">
+        ✋ Request Control
+      </button>`;
+  }
+}
+
+/* ─── USERS RENDER ──────────────────────────────────────────────────── */
+function renderUsers() {
+  const el = document.getElementById('usersList');
+  if (!users.length) { el.innerHTML = ''; return; }
+
+  const roomNameEl = document.getElementById('rb-name');
+  if (currentRoom) roomNameEl.textContent = currentRoom.name || 'Room';
+
+  el.innerHTML = users.map(u => {
+    const isMe = u.socketId === mySocketId;
+    const initial = (u.name || '?')[0].toUpperCase();
+    return `
+    <div class="user-item ${isMe ? 'me' : ''}">
+      <div class="user-avatar" style="background:${u.color}22;color:${u.color}">${initial}</div>
+      <div class="user-info">
+        <div class="user-name">${esc(u.name)}${isMe ? ' <span style="color:var(--dim);font-size:9px">(you)</span>' : ''}</div>
+        <div class="user-role">${u.isController ? 'Controller' : 'Viewer'}</div>
+      </div>
+      ${u.isController ? '<div class="user-ctrl-badge">🎮</div>' : ''}
+    </div>`;
+  }).join('');
+}
+
+/* ─── CHAT ──────────────────────────────────────────────────────────── */
+function sendChat() {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  socket.emit('chat:message', { message: msg });
+  input.value = '';
+}
+
+function addChatMsg(msg) {
+  const el = document.getElementById('chatMessages');
+  const time = new Date(msg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const isMe = msg.socketId === mySocketId;
+
+  const div = document.createElement('div');
+  div.className = 'chat-msg';
+  div.style.borderLeftColor = msg.color || 'var(--border)';
+  div.innerHTML = `
+    <div class="cm-header">
+      <span class="cm-name" style="color:${msg.color}">${esc(msg.user)}</span>
+      ${isMe ? '<span style="font-size:9px;color:var(--dim)">(you)</span>' : ''}
+      <span class="cm-time">${time}</span>
+    </div>
+    <div class="cm-text">${esc(msg.message)}</div>`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+
+  // badge if not on chat tab
+  if (activeTab !== 'chat') {
+    unreadChat++;
+    const tab = document.querySelector('.stab:nth-child(2)');
+    tab.textContent = `Chat (${unreadChat})`;
+  }
+}
+
+function addSystemMsg(text) {
+  const el = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'chat-notif';
+  div.textContent = `— ${text} —`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+/* ─── TABS ──────────────────────────────────────────────────────────── */
+function switchTab(name, el) {
+  activeTab = name;
+  document.querySelectorAll('.stab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+
+  if (name === 'chat') {
+    unreadChat = 0;
+    el.textContent = 'Chat';
+    const chatEl = document.getElementById('chatMessages');
+    setTimeout(() => chatEl.scrollTop = chatEl.scrollHeight, 50);
+  }
+}
+
+/* ─── VIEWS ─────────────────────────────────────────────────────────── */
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(name + 'View').classList.add('active');
+}
+
+/* ─── UTILS ─────────────────────────────────────────────────────────── */
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function timeAgo(iso) {
+  const diff = (Date.now() - new Date(iso)) / 1000;
+  if (diff < 60)  return 'just now';
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  return `${Math.floor(diff/3600)}h ago`;
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
