@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CoWatch — Watch Together</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<!-- HLS.js for .m3u8 live streams -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.7/hls.min.js"></script>
+<!-- Dash.js for MPEG-DASH streams -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dashjs/4.7.4/dash.all.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --surface: #111116;
+    --surface2: #18181f;
+    --border: #ffffff0f;
+    --accent: #e8c547;
+    --accent2: #c47e3b;
+    --text: #f0ede6;
+    --muted: #6b6875;
+    --danger: #e05b5b;
+    --online: #5be07a;
+    --radius: 10px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── LOBBY ────────────────────────────────── */
+  #lobby {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 2rem;
+    background:
+      radial-gradient(ellipse 60% 40% at 50% 0%, #e8c54715 0%, transparent 70%),
+      radial-gradient(ellipse 40% 30% at 80% 80%, #c47e3b10 0%, transparent 60%),
+      var(--bg);
+  }
+
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(2.5rem, 6vw, 4rem);
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0.25rem;
+  }
+
+  .tagline {
+    color: var(--muted);
+    font-size: 0.9rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 3rem;
+  }
+
+  .lobby-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .lobby-card h2 {
+    font-family: 'DM Serif Display', serif;
+    font-weight: 400;
+    font-size: 1.4rem;
+    margin-bottom: 0.5rem;
+  }
+
+  label {
+    display: block;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.4rem;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input[type="text"]:focus { border-color: var(--accent); }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: var(--muted);
+    font-size: 0.75rem;
+  }
+  .divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .btn {
+    width: 100%;
+    padding: 0.85rem;
+    border: none;
+    border-radius: var(--radius);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.02em;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #0a0a0c;
+  }
+
+  .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  .room-code-display {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  /* ── APP LAYOUT ───────────────────────────── */
+  #app {
+    display: none;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.5rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 1rem;
+  }
+
+  .topbar-logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.2rem;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    white-space: nowrap;
+  }
+
+  .room-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .room-badge {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.3rem 0.7rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent);
+    cursor: pointer;
+  }
+
+  .role-badge {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    background: #e8c54720;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .role-badge.guest { background: #6b687520; color: var(--muted); }
+
+  /* source type pill */
+  .source-pill {
+    font-size: 0.68rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .source-pill.mp4   { background:#5be07a20; color:#5be07a; }
+  .source-pill.hls   { background:#e8714720; color:#e87147; }
+  .source-pill.dash  { background:#478be820; color:#478be8; }
+  .source-pill.iframe{ background:#b847e820; color:#b847e8; }
+  .source-pill.live  { background:#e8474720; color:#e84747; }
+
+  /* ── MAIN AREA ────────────────────────────── */
+  .main { display: flex; flex: 1; overflow: hidden; }
+
+  .video-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #000;
+  }
+
+  .video-wrapper {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #050507;
+    position: relative;
+    overflow: hidden;
+  }
+
+  video {
+    max-width: 100%;
+    max-height: 100%;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    outline: none;
+  }
+
+  #iframePlayer {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: none;
+  }
+
+  /* iframe overlay: for guests we block interaction so they can't
+     accidentally desync by clicking inside the iframe */
+  #iframeOverlay {
+    position: absolute;
+    inset: 0;
+    display: none;
+    background: transparent;
+    z-index: 5;
+    cursor: not-allowed;
+  }
+
+  .iframe-notice {
+    position: absolute;
+    bottom: 0.75rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #000000cc;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.72rem;
+    color: var(--muted);
+    z-index: 10;
+    white-space: nowrap;
+    display: none;
+  }
+
+  .video-placeholder {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .video-placeholder .icon { font-size: 3rem; opacity: 0.3; }
+
+  /* URL Bar */
+  .url-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .url-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .url-bar input {
+    flex: 1;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.82rem;
+  }
+
+  .url-bar .btn {
+    width: auto;
+    padding: 0.6rem 1.2rem;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+
+  .source-hints {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    font-size: 0.7rem;
+    color: var(--muted);
+    align-items: center;
+  }
+
+  .source-hints span { opacity: 0.6; }
+
+  .hint-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.15rem 0.45rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--muted);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .hint-chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  .host-only-hint {
+    display: none;
+    color: var(--muted);
+    font-size: 0.75rem;
+    padding: 0.75rem 1rem;
+    text-align: center;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── SIDEBAR ──────────────────────────────── */
+  .sidebar {
+    width: 300px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .sidebar-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 0.85rem;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.2s;
+    border-bottom: 2px solid transparent;
+  }
+
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .tab-panel { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+  .tab-panel.active { display: flex; }
+
+  .members-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .member-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 8px;
+    background: var(--surface2);
+    font-size: 0.85rem;
+  }
+
+  .member-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--online); flex-shrink: 0; }
+  .member-crown { margin-left: auto; font-size: 0.75rem; color: var(--accent); }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    scroll-behavior: smooth;
+  }
+
+  .chat-msg { display: flex; flex-direction: column; gap: 0.2rem; animation: fadeUp 0.2s ease; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .chat-msg .sender { font-size: 0.7rem; color: var(--muted); letter-spacing: 0.05em; }
+  .chat-msg.system .sender { color: var(--accent2); }
+
+  .chat-msg .text {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text);
+    background: var(--surface2);
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    border-top-left-radius: 2px;
+    word-break: break-word;
+  }
+
+  .chat-msg.system .text {
+    background: transparent;
+    color: var(--muted);
+    font-style: italic;
+    padding: 0;
+    font-size: 0.78rem;
+  }
+
+  .chat-input-row {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .chat-input-row input { flex: 1; padding: 0.6rem 0.85rem; font-size: 0.82rem; }
+  .chat-input-row .send-btn {
+    width: auto; padding: 0.6rem 1rem;
+    background: var(--accent); color: #0a0a0c; font-size: 0.85rem;
+  }
+
+  /* ── SYNC TOAST ───────────────────────────── */
+  .sync-toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 1.2rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    transition: transform 0.3s ease;
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  .sync-toast.visible { transform: translateX(-50%) translateY(0); }
+
+  /* live indicator */
+  .live-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    background: #e84747;
+    border-radius: 50%;
+    margin-right: 4px;
+    animation: blink 1.2s ease-in-out infinite;
+    vertical-align: middle;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- ═══ LOBBY ═══════════════════════════════════════════════════ -->
+<div id="lobby">
+  <div class="logo">CoWatch</div>
+  <div class="tagline">Watch together, apart</div>
+
+  <div class="lobby-card">
+    <h2>Join a room</h2>
+
+    <div>
+      <label>Your name</label>
+      <input type="text" id="usernameInput" placeholder="e.g. Alex" maxlength="20">
+    </div>
+
+    <div>
+      <label>Room code</label>
+      <input type="text" id="roomInput" placeholder="e.g. movie-night-42" maxlength="30">
+    </div>
+
+    <button class="btn btn-primary" onclick="joinRoom()">Enter Room →</button>
+    <div class="divider">or</div>
+    <button class="btn btn-ghost" onclick="createRoom()">Create New Room</button>
+    <div class="room-code-display" id="generatedCode" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ═══ APP ══════════════════════════════════════════════════════ -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-logo">CoWatch</div>
+    <div class="room-info">
+      <span>Room:</span>
+      <span class="room-badge" id="roomBadge" onclick="copyRoomCode()" title="Click to copy">—</span>
+      <span class="role-badge" id="roleBadge">Host</span>
+      <span class="source-pill" id="sourcePill" style="display:none"></span>
+    </div>
+    <div style="font-size:0.8rem; color: var(--muted);" id="usernameDisplay"></div>
+  </div>
+
+  <div class="main">
+    <!-- Video Column -->
+    <div class="video-col">
+      <div class="video-wrapper" id="videoWrapper">
+        <div class="video-placeholder" id="placeholder">
+          <div class="icon">🎬</div>
+          <div>Paste a URL below to start watching</div>
+          <div style="font-size:0.75rem; opacity:0.5;">Supports MP4 · HLS · DASH · YouTube · Twitch · any iframe</div>
+        </div>
+        <!-- Native video (mp4, hls, dash) -->
+        <video id="videoPlayer" style="display:none" controls></video>
+        <!-- Iframe (YouTube, Twitch, etc.) -->
+        <iframe id="iframePlayer" allowfullscreen allow="autoplay; fullscreen"></iframe>
+        <!-- Guest iframe overlay (prevents guests from controlling iframe) -->
+        <div id="iframeOverlay"></div>
+        <!-- Iframe notice -->
+        <div class="iframe-notice" id="iframeNotice"></div>
+      </div>
+
+      <!-- Host URL bar -->
+      <div class="url-bar" id="urlBar">
+        <div class="url-row">
+          <input type="text" id="videoUrlInput" placeholder="https://… (mp4, m3u8, mpd, YouTube, Twitch, iframe URL)">
+          <button class="btn btn-primary" onclick="loadVideo()">Load</button>
+        </div>
+        <div class="source-hints">
+          <span>Try:</span>
+          <span class="hint-chip" onclick="fillExample('mp4')">MP4</span>
+          <span class="hint-chip" onclick="fillExample('hls')">HLS stream</span>
+          <span class="hint-chip" onclick="fillExample('dash')">DASH stream</span>
+          <span class="hint-chip" onclick="fillExample('youtube')">YouTube</span>
+          <span class="hint-chip" onclick="fillExample('twitch')">Twitch</span>
+        </div>
+      </div>
+      <!-- Guest waiting hint -->
+      <div class="host-only-hint" id="guestHint">🎬 Waiting for host to load a video...</div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-tabs">
+        <button class="tab-btn active" onclick="switchTab('chat')">Chat</button>
+        <button class="tab-btn" onclick="switchTab('members')">Members</button>
+      </div>
+
+      <div class="tab-panel active" id="tab-chat">
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-row">
+          <input type="text" id="chatInput" placeholder="Say something..." maxlength="200"
+            onkeydown="if(event.key==='Enter') sendChat()">
+          <button class="btn send-btn" onclick="sendChat()">↑</button>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-members">
+        <div class="members-list" id="membersList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sync-toast" id="syncToast">Syncing...</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════
+const socket = io();
+let roomId = '', username = '', role = 'guest';
+let isSyncing = false;
+let heartbeatInterval = null;
+let currentSourceType = null; // 'mp4' | 'hls' | 'dash' | 'iframe' | 'live-hls'
+let hlsInstance = null;
+let dashInstance = null;
+
+const videoEl    = document.getElementById('videoPlayer');
+const iframeEl   = document.getElementById('iframePlayer');
+const overlay    = document.getElementById('iframeOverlay');
+const placeholder = document.getElementById('placeholder');
+const notice     = document.getElementById('iframeNotice');
+const sourcePill = document.getElementById('sourcePill');
+
+// ═══════════════════════════════════════════════════════════════
+//  URL DETECTION
+// ═══════════════════════════════════════════════════════════════
+function detectSourceType(url) {
+  try {
+    const u = new URL(url);
+    const path = u.pathname.toLowerCase();
+    const host = u.hostname.toLowerCase();
+
+    // YouTube
+    if (host.includes('youtube.com') || host.includes('youtu.be')) return 'youtube';
+    // Twitch
+    if (host.includes('twitch.tv')) return 'twitch';
+    // HLS
+    if (path.endsWith('.m3u8')) return 'hls';
+    // MPEG-DASH
+    if (path.endsWith('.mpd')) return 'dash';
+    // MP4 / webm / ogg
+    if (/\.(mp4|webm|ogg|mov|mkv)(\?|$)/.test(path)) return 'mp4';
+    // Generic iframe fallback (any http/https URL)
+    return 'iframe';
+  } catch {
+    return null;
+  }
+}
+
+// Build embeddable iframe src from raw URL
+function buildIframeSrc(url, type) {
+  if (type === 'youtube') {
+    let videoId = null;
+    try {
+      const u = new URL(url);
+      if (u.hostname.includes('youtu.be')) {
+        videoId = u.pathname.slice(1);
+      } else {
+        videoId = u.searchParams.get('v');
+      }
+    } catch {}
+    if (!videoId) return url;
+    // enablejsapi=1 allows postMessage control (limited without API key)
+    return `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
+  }
+
+  if (type === 'twitch') {
+    try {
+      const u = new URL(url);
+      const parts = u.pathname.split('/').filter(Boolean);
+      const channel = parts[0];
+      const parent = window.location.hostname || 'localhost';
+      return `https://player.twitch.tv/?channel=${channel}&parent=${parent}&autoplay=true`;
+    } catch {}
+  }
+
+  return url; // raw iframe for anything else
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LOBBY
+// ═══════════════════════════════════════════════════════════════
+function generateCode() {
+  const w = ['moon','river','velvet','cobalt','amber','dusk','prism','cedar','opal','flicker'];
+  return `${w[Math.random()*w.length|0]}-${w[Math.random()*w.length|0]}-${Math.random()*90+10|0}`;
+}
+
+function createRoom() {
+  const code = generateCode();
+  document.getElementById('roomInput').value = code;
+  const el = document.getElementById('generatedCode');
+  el.style.display = 'block';
+  el.textContent = `Room code: ${code}`;
+}
+
+function joinRoom() {
+  username = document.getElementById('usernameInput').value.trim();
+  roomId   = document.getElementById('roomInput').value.trim();
+  if (!username) { alert('Please enter your name'); return; }
+  if (!roomId)   { alert('Please enter or create a room code'); return; }
+
+  socket.emit('joinRoom', { roomId, username });
+  document.getElementById('lobby').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('roomBadge').textContent = roomId;
+  document.getElementById('usernameDisplay').textContent = username;
+}
+
+function copyRoomCode() {
+  navigator.clipboard.writeText(roomId).then(() => showToast('Room code copied!'));
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ROLES
+// ═══════════════════════════════════════════════════════════════
+socket.on('roleAssigned', ({ role: r }) => {
+  role = r;
+  const badge = document.getElementById('roleBadge');
+  badge.textContent = role === 'host' ? 'Host' : 'Guest';
+  badge.className = 'role-badge' + (role === 'guest' ? ' guest' : '');
+
+  if (role === 'host') {
+    document.getElementById('urlBar').style.display = 'flex';
+    document.getElementById('guestHint').style.display = 'none';
+    startHeartbeat();
+  } else {
+    document.getElementById('urlBar').style.display = 'none';
+    document.getElementById('guestHint').style.display = 'block';
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  VIDEO LOADING
+// ═══════════════════════════════════════════════════════════════
+function loadVideo() {
+  const url = document.getElementById('videoUrlInput').value.trim();
+  if (!url) return;
+  socket.emit('setVideo', { roomId, videoUrl: url });
+  applyVideoUrl(url);
+}
+
+socket.on('loadVideo', ({ videoUrl }) => {
+  applyVideoUrl(videoUrl);
+  if (role === 'host') document.getElementById('videoUrlInput').value = videoUrl;
+});
+
+function applyVideoUrl(url) {
+  const type = detectSourceType(url);
+  if (!type) { showToast('Unrecognized URL'); return; }
+
+  currentSourceType = type;
+  teardownPrevious();
+  placeholder.style.display = 'none';
+
+  // Update source pill
+  const isLive = type === 'hls' || type === 'live-hls';
+  showSourcePill(type, isLive);
+
+  if (type === 'mp4') {
+    setupNativeVideo(url, false);
+  } else if (type === 'hls') {
+    setupHLS(url);
+  } else if (type === 'dash') {
+    setupDASH(url);
+  } else {
+    // youtube, twitch, or generic iframe
+    setupIframe(url, type);
+  }
+}
+
+function teardownPrevious() {
+  // Destroy HLS
+  if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+  // Destroy DASH
+  if (dashInstance) { dashInstance.reset(); dashInstance = null; }
+  // Reset video element
+  videoEl.pause();
+  videoEl.removeAttribute('src');
+  videoEl.load();
+  videoEl.style.display = 'none';
+  // Reset iframe
+  iframeEl.src = 'about:blank';
+  iframeEl.style.display = 'none';
+  overlay.style.display = 'none';
+  notice.style.display = 'none';
+}
+
+// ─── Native video (MP4, WebM) ───────────────────────────────
+function setupNativeVideo(url, isLive) {
+  videoEl.src = url;
+  videoEl.style.display = 'block';
+  videoEl.load();
+  if (role === 'guest') videoEl.controls = false; // guests can't control
+  else videoEl.controls = true;
+}
+
+// ─── HLS (.m3u8) ────────────────────────────────────────────
+function setupHLS(url) {
+  videoEl.style.display = 'block';
+  videoEl.controls = role === 'host';
+
+  if (Hls.isSupported()) {
+    hlsInstance = new Hls();
+    hlsInstance.loadSource(url);
+    hlsInstance.attachMedia(videoEl);
+    hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+      // Detect live
+      const isLive = hlsInstance.levels.some(l => l.details?.live);
+      if (isLive) {
+        currentSourceType = 'live-hls';
+        showSourcePill('hls', true);
+        showToast('🔴 Live stream detected');
+      }
+      if (role === 'guest') videoEl.play().catch(() => {});
+    });
+  } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+    // Safari native HLS
+    videoEl.src = url;
+    videoEl.load();
+  }
+}
+
+// ─── MPEG-DASH (.mpd) ────────────────────────────────────────
+function setupDASH(url) {
+  videoEl.style.display = 'block';
+  videoEl.controls = role === 'host';
+
+  dashInstance = dashjs.MediaPlayer().create();
+  dashInstance.initialize(videoEl, url, role === 'host');
+  dashInstance.updateSettings({ streaming: { lowLatencyEnabled: true } });
+}
+
+// ─── Iframe (YouTube, Twitch, generic) ──────────────────────
+function setupIframe(url, type) {
+  const embedSrc = buildIframeSrc(url, type);
+  iframeEl.src = embedSrc;
+  iframeEl.style.display = 'block';
+
+  if (role === 'guest') {
+    // Overlay to block guest interaction with iframe
+    overlay.style.display = 'block';
+    notice.style.display = 'block';
+    notice.innerHTML = `<span>⚠️ ${type === 'youtube' ? 'YouTube' : type === 'twitch' ? 'Twitch' : 'Iframe'} — host controls playback. Chat to coordinate.</span>`;
+  } else {
+    notice.style.display = 'block';
+    notice.innerHTML = `<span>ℹ️ ${type === 'youtube' ? 'YouTube' : type === 'twitch' ? 'Twitch' : 'Iframe'} — use your player controls. Seek/play syncs guests automatically.</span>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SOURCE PILL
+// ═══════════════════════════════════════════════════════════════
+function showSourcePill(type, isLive) {
+  const labels = {
+    mp4: 'MP4', hls: 'HLS', 'live-hls': 'HLS', dash: 'DASH',
+    youtube: 'YouTube', twitch: 'Twitch', iframe: 'Iframe'
+  };
+  const cssClass = { mp4:'mp4', hls:'hls', 'live-hls':'live', dash:'dash',
+                     youtube:'iframe', twitch:'iframe', iframe:'iframe' };
+
+  sourcePill.style.display = 'inline-block';
+  sourcePill.className = `source-pill ${cssClass[type] || 'mp4'}`;
+  sourcePill.innerHTML = isLive
+    ? `<span class="live-dot"></span>LIVE`
+    : labels[type] || type.toUpperCase();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SYNC LOGIC  (native video only; iframe = best-effort)
+// ═══════════════════════════════════════════════════════════════
+const isNativeType = () => ['mp4','hls','live-hls','dash'].includes(currentSourceType);
+const isLiveStream = () => currentSourceType === 'live-hls';
+
+videoEl.addEventListener('play', () => {
+  if (isSyncing || role !== 'host' || !isNativeType()) return;
+  socket.emit('videoAction', { roomId, action: 'play', time: videoEl.currentTime });
+});
+
+videoEl.addEventListener('pause', () => {
+  if (isSyncing || role !== 'host' || !isNativeType()) return;
+  socket.emit('videoAction', { roomId, action: 'pause', time: videoEl.currentTime });
+});
+
+videoEl.addEventListener('seeked', () => {
+  if (isSyncing || role !== 'host' || !isNativeType()) return;
+  socket.emit('videoAction', { roomId, action: 'seek', time: videoEl.currentTime });
+});
+
+socket.on('syncAction', ({ action, time }) => {
+  if (!isNativeType()) return; // iframe guests handle manually
+  isSyncing = true;
+
+  if (!isLiveStream() && Math.abs(videoEl.currentTime - time) > 1) {
+    videoEl.currentTime = time;
+  }
+
+  if (action === 'play')  videoEl.play().catch(() => {});
+  if (action === 'pause') videoEl.pause();
+  if (action === 'seek' && !isLiveStream()) videoEl.currentTime = time;
+
+  showToast('Synced with host');
+  setTimeout(() => { isSyncing = false; }, 300);
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  HEARTBEAT
+// ═══════════════════════════════════════════════════════════════
+function startHeartbeat() {
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
+  heartbeatInterval = setInterval(() => {
+    if (!isNativeType()) return;
+    socket.emit('heartbeat', {
+      roomId,
+      time: videoEl.currentTime,
+      playing: !videoEl.paused,
+      isLive: isLiveStream()
+    });
+  }, 5000);
+}
+
+socket.on('heartbeat', ({ time, playing, isLive }) => {
+  if (isSyncing || !isNativeType()) return;
+  if (isLive) {
+    // For live streams just keep playing; no seeking
+    if (playing && videoEl.paused) { isSyncing = true; videoEl.play().catch(()=>{}); setTimeout(()=>{isSyncing=false;},300); }
+    return;
+  }
+
+  const drift = Math.abs(videoEl.currentTime - time);
+  if (drift > 2) {
+    isSyncing = true;
+    videoEl.currentTime = time;
+    showToast(`Resynced (${drift.toFixed(1)}s drift)`);
+    setTimeout(() => { isSyncing = false; }, 300);
+  } else if (drift > 0.5) {
+    videoEl.playbackRate = videoEl.currentTime < time ? 1.08 : 0.94;
+    setTimeout(() => { videoEl.playbackRate = 1.0; }, 3000);
+  }
+
+  if (playing && videoEl.paused && !isSyncing) {
+    isSyncing = true; videoEl.play().catch(()=>{}); setTimeout(()=>{isSyncing=false;},300);
+  } else if (!playing && !videoEl.paused && !isSyncing) {
+    isSyncing = true; videoEl.pause(); setTimeout(()=>{isSyncing=false;},300);
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  MEMBERS
+// ═══════════════════════════════════════════════════════════════
+socket.on('memberList', (members) => {
+  const list = document.getElementById('membersList');
+  list.innerHTML = '';
+  members.forEach((name, i) => {
+    const div = document.createElement('div');
+    div.className = 'member-item';
+    div.innerHTML = `
+      <div class="member-dot"></div>
+      <span>${escapeHtml(name)}</span>
+      ${i === 0 ? '<span class="member-crown">👑 Host</span>' : ''}
+    `;
+    list.appendChild(div);
+  });
+  document.querySelectorAll('.tab-btn')[1].textContent = `Members (${members.length})`;
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  CHAT
+// ═══════════════════════════════════════════════════════════════
+function sendChat() {
+  const input = document.getElementById('chatInput');
+  const message = input.value.trim();
+  if (!message) return;
+  socket.emit('chatMessage', { roomId, message });
+  input.value = '';
+}
+
+socket.on('chatMessage', ({ username: sender, message }) => {
+  const container = document.getElementById('chatMessages');
+  const isSystem = sender === 'System';
+  const div = document.createElement('div');
+  div.className = 'chat-msg' + (isSystem ? ' system' : '');
+  div.innerHTML = isSystem
+    ? `<span class="text">${message}</span>`
+    : `<span class="sender">${escapeHtml(sender)}</span><span class="text">${escapeHtml(message)}</span>`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+});
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) =>
+    b.classList.toggle('active', ['chat','members'][i] === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════════════════════
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('syncToast');
+  t.textContent = msg;
+  t.classList.add('visible');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('visible'), 2500);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  EXAMPLE URLS
+// ═══════════════════════════════════════════════════════════════
+const EXAMPLES = {
+  mp4:     'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+  hls:     'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+  dash:    'https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd',
+  youtube: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+  twitch:  'https://www.twitch.tv/twitchrivals',
+};
+
+function fillExample(type) {
+  document.getElementById('videoUrlInput').value = EXAMPLES[type] || '';
+}
+</script>
+</body>
+</html>
