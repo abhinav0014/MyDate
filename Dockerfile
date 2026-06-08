@@ -1,8 +1,5 @@
 FROM ubuntu:22.04
 
-# This image is used by the room-server to spawn per-room containers.
-# Build it once: docker build -t browservm:latest -f Dockerfile.vm .
-
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DISPLAY=:1
 ENV SCREEN_WIDTH=1280
@@ -15,15 +12,16 @@ RUN apt-get update && apt-get install -y \
     libnotify-bin dbus-x11 at-spi2-core \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install noVNC
+# Install websockify via pip (provides the `websockify` binary on PATH)
+RUN pip3 install websockify
+
+# Install noVNC (static files only — no websockify tarball needed)
 RUN mkdir -p /opt/novnc && \
     wget -qO- https://github.com/novnc/noVNC/archive/refs/tags/v1.4.0.tar.gz \
-      | tar xz --strip-components=1 -C /opt/novnc && \
-    mkdir -p /opt/novnc/utils/websockify && \
-    wget -qO- https://github.com/novnc/websockify/archive/refs/tags/v0.11.0.tar.gz \
-      | tar xz --strip-components=1 -C /opt/novnc/utils/websockify
+      | tar xz --strip-components=1 -C /opt/novnc
 
-RUN pip3 install websockify
+# Verify websockify is callable
+RUN which websockify && websockify --version
 
 # Openbox config — borderless, maximized
 RUN mkdir -p /root/.config/openbox
