@@ -106,7 +106,7 @@ function buildMemberList(roomId) {
   return hostName ? [hostName, ...others] : others;
 }
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`\n🎬 CoWatch server → http://localhost:${PORT}\n`);
+const PORT = 3000;
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n🎬 CoWatch server → {PORT}`);
 });
