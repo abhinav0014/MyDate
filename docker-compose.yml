@@ -1,5 +1,13 @@
 version: '3.8'
 
+# BrowserVM Rooms — Multi-user shared browser rooms
+# Each room spawns its own container on demand via the Node.js server.
+#
+# Ports:
+#   3000 → Room server (UI + Socket.io + WS proxy)
+#
+# The room-server container manages sibling containers via Docker socket.
+
 services:
 
   # ── Room Server (Node.js) ─────────────────────────────────────────────────

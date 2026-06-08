@@ -1,0 +1,17 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+# Copy server source
+COPY index.js .
+
+# Client public dir is mounted as volume at runtime
+RUN mkdir -p /app/client/public
+
+EXPOSE 3000
+
+CMD ["node", "index.js"]
